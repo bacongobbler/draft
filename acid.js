@@ -1,0 +1,30 @@
+events.push = function(e) {
+  // This is a Go project, so we want to set it up for Go.
+  var gopath = "/go";
+
+  // To set GOPATH correctly, we have to override the default
+  // path that Acid sets.
+  var localPath = gopath + "/src/github.com/Azure/draft";
+
+  var goBuild = new Job("draft-test");
+
+  goBuild.image = "golang:1.8";
+  goBuild.mountPath = localPath
+
+  // Set a few environment variables.
+  goBuild.env = {
+      "DEST_PATH": localPath,
+      "GOPATH": gopath
+  };
+
+  goBuild.tasks = [
+    "cd $DEST_PATH",
+    "make bootstrap",
+    "make build",
+    "make test",
+    // $CODECOV_TOKEN needs to be injected into the project's secrets in order for this to work
+    "bash <(curl -s https://codecov.io/bash)"
+  ];
+
+  goBuild.run();
+}
