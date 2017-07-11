@@ -34,8 +34,7 @@ events.push = function(e) {
     "make bootstrap",
     "make build",
     "make test",
-    // $CODECOV_TOKEN needs to be injected into the project's secrets in order for this to work
-    "bash <(curl -s https://codecov.io/bash)"
+    "curl -s https://codecov.io/bash | bash -s - -t $CODECOV_TOKEN"
   ];
 
   goBuild.run();
