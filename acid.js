@@ -1,4 +1,15 @@
 events.push = function(e) {
+  var registries = {
+    "dockerhub": {
+      "production": {
+        "name": "microsoft",
+        "email": "matt.fisher@microsoft.com",
+        "username": "bacongobbler",
+        "password": e.env.dockerPasswd
+      }
+    }
+  }
+
   // This is a Go project, so we want to set it up for Go.
   var gopath = "/go";
 
@@ -14,7 +25,8 @@ events.push = function(e) {
   // Set a few environment variables.
   goBuild.env = {
       "DEST_PATH": localPath,
-      "GOPATH": gopath
+      "GOPATH": gopath,
+      "CODECOV_TOKEN": e.env.codecovToken
   };
 
   goBuild.tasks = [
