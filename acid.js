@@ -1,41 +1,62 @@
-events.push = function(e) {
-  var registries = {
-    "dockerhub": {
-      "production": {
-        "name": "microsoft",
-        "email": "matt.fisher@microsoft.com",
-        "username": "bacongobbler",
-        "password": e.env.dockerPasswd
-      }
+var goImage = "golang:1.8"
+
+// To set GOPATH correctly, we have to override the default
+// path that Acid sets.
+var localPath = "/go/src/github.com/Azure/draft";
+var defaultGoEnv = {
+  "DEST_PATH": localPath
+};
+
+var azure = {
+  "container": "draft",
+  "storageAccount": "azuredraft",
+}
+
+var registries = {
+  "dockerhub": {
+    "production": {
+      "name": "microsoft",
+      "email": "matt.fisher@microsoft.com",
+      "username": "bacongobbler"
     }
   }
+}
 
-  // This is a Go project, so we want to set it up for Go.
-  var gopath = "/go";
+var buildJob = new Job("test");
+buildJob.image = goImage;
+buildJob.mountPath = localPath;
+buildJob.env = defaultGoEnv;
+buildJob.tasks = [
+  "cd $DEST_PATH",
+  "make bootstrap",
+  "make test",
+  "curl -s https://codecov.io/bash | bash -s - -t $CODECOV_TOKEN"
+];
 
-  // To set GOPATH correctly, we have to override the default
-  // path that Acid sets.
-  var localPath = gopath + "/src/github.com/Azure/draft";
+// if the build succeeds, let's push up some artifacts
+var azureJob = new Job("azure");
+azureJob.image = goImage;
+azureJob.mountPath = localPath;
+azureJob.env = defaultGoEnv;
 
-  var goBuild = new Job("draft-test");
+azureJob.tasks = [
+  "cd $DEST_PATH",
+  "make bootstrap",
+  "make build-cross",
+  "make dist",
+  "az storage blob upload-batch --source _dist/ --destination $AZURE_STORAGE_CONTAINER --pattern *.tar.gz*"
+];
 
-  goBuild.image = "golang:1.8";
-  goBuild.mountPath = localPath
+events.push = function(e) {
+  buildJob.env["CODECOV_TOKEN"] = e.env.CODECOV_TOKEN;
 
-  // Set a few environment variables.
-  goBuild.env = {
-      "DEST_PATH": localPath,
-      "GOPATH": gopath,
-      "CODECOV_TOKEN": e.env.codecovToken
-  };
+  azureJob.env["AZURE_STORAGE_ACCOUNT"] = e.env.AZURE_STORAGE_ACCOUNT;
+  azureJob.env["AZURE_STORAGE_CONTAINER"] = e.env.AZURE_STORAGE_CONTAINER;
+  azureJob.env["AZURE_STORAGE_KEY"] = e.env.AZURE_STORAGE_KEY;
 
-  goBuild.tasks = [
-    "cd $DEST_PATH",
-    "make bootstrap",
-    "make build",
-    "make test",
-    "curl -s https://codecov.io/bash | bash -s - -t $CODECOV_TOKEN"
-  ];
+  wg = new WaitGroup();
+  wg.add(buildJob);
+  wg.add(azureJob);
 
-  goBuild.run();
+  wg.run();
 }
