@@ -27,10 +27,10 @@ buildJob.image = goImage;
 buildJob.mountPath = localPath;
 buildJob.env = defaultGoEnv;
 buildJob.tasks = [
-  "cd $DEST_PATH",
-  "make bootstrap",
-  "make test",
-  "curl -s https://codecov.io/bash | bash -s - -t $CODECOV_TOKEN"
+  'cd $DEST_PATH',
+  'make bootstrap',
+  'make test',
+  'curl -s https://codecov.io/bash | bash -s - -t $CODECOV_TOKEN'
 ];
 
 // if the build succeeds, let's push up some artifacts
@@ -40,11 +40,18 @@ azureJob.mountPath = localPath;
 azureJob.env = defaultGoEnv;
 
 azureJob.tasks = [
-  "cd $DEST_PATH",
-  "make bootstrap",
-  "make build-cross",
-  "make dist",
-  "az storage blob upload-batch --source _dist/ --destination $AZURE_STORAGE_CONTAINER --pattern *.tar.gz*"
+  // install azure-cli
+  'apt-get update -y',
+  'apt-get install -y apt-transport-https',
+  'echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ wheezy main" | tee /etc/apt/sources.list.d/azure-cli.list',
+  'apt-key adv --keyserver packages.microsoft.com --recv-keys 417A0893',
+  'apt-get update -y',
+  'apt-get install -y azure-cli',
+  'cd $DEST_PATH',
+  'make bootstrap',
+  'make build-cross',
+  'make dist',
+  'az storage blob upload-batch --source _dist/ --destination $AZURE_STORAGE_CONTAINER --pattern *.tar.gz*'
 ];
 
 events.push = function(e) {
