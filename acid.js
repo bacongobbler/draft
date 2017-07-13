@@ -44,8 +44,10 @@ dockerJob.env = {
   "REGISTRY": "docker.io/",
   // TODO: change this back to microsoft once we are ready to ship
   "IMAGE_PREFIX": "bacongobbler",
+  "DOCKER_DRIVER": "overlay"
 }
 dockerJob.tasks = [
+  'dockerd --host=unix:///var/run/docker.sock &',
   'docker login -u="$DOCKER_USER" -p="$DOCKER_PASSWORD"',
   'make docker-build docker-push'
 ];
