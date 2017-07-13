@@ -22,11 +22,11 @@ var registries = {
   }
 }
 
-var buildJob = new Job("test");
-buildJob.image = goImage;
-buildJob.mountPath = localPath;
-buildJob.env = defaultGoEnv;
-buildJob.tasks = [
+var testJob = new Job("test");
+testJob.image = goImage;
+testJob.mountPath = localPath;
+testJob.env = defaultGoEnv;
+testJob.tasks = [
   'cd $DEST_PATH',
   'make bootstrap',
   'make test',
@@ -55,7 +55,7 @@ azureJob.tasks = [
 ];
 
 events.push = function(e) {
-  buildJob.env["CODECOV_TOKEN"] = e.env.CODECOV_TOKEN;
+  testJob.env["CODECOV_TOKEN"] = e.env.CODECOV_TOKEN;
 
   azureJob.env["AZURE_STORAGE_ACCOUNT"] = e.env.AZURE_STORAGE_ACCOUNT;
   azureJob.env["AZURE_STORAGE_CONTAINER"] = e.env.AZURE_STORAGE_CONTAINER;
@@ -63,8 +63,15 @@ events.push = function(e) {
   azureJob.env["VERSION"] = e.commit;
 
   wg = new WaitGroup();
-  wg.add(buildJob);
+  wg.add(testJob);
   wg.add(azureJob);
 
-  wg.run();
+  wg.jobs.forEach(function (j) {
+      j.background();
+  })
+
+  // HACK(bacongobbler): give the jobs a 10 minute headstart before we start to check in on them
+  sleep(600);
+
+  wg.wait();
 }
