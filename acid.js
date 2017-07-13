@@ -60,6 +60,7 @@ events.push = function(e) {
   azureJob.env["AZURE_STORAGE_ACCOUNT"] = e.env.AZURE_STORAGE_ACCOUNT;
   azureJob.env["AZURE_STORAGE_CONTAINER"] = e.env.AZURE_STORAGE_CONTAINER;
   azureJob.env["AZURE_STORAGE_KEY"] = e.env.AZURE_STORAGE_KEY;
+  azureJob.env["VERSION"] = e.commit;
 
   wg = new WaitGroup();
   wg.add(buildJob);
