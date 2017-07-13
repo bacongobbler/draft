@@ -51,6 +51,10 @@ dockerJob.tasks = [
   'docker login -u="$DOCKER_USER" -p="$DOCKER_PASSWORD"',
   'make docker-build docker-push'
 ];
+// run the docker job as a privileged container
+dockerJob.container.securityContext = {
+  privileged: true
+}
 
 events.push = function(e) {
   testJob.env["CODECOV_TOKEN"] = e.env.CODECOV_TOKEN;
