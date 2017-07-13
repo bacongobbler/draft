@@ -7,21 +7,6 @@ var defaultGoEnv = {
   "DEST_PATH": localPath
 };
 
-var azure = {
-  "container": "draft",
-  "storageAccount": "azuredraft",
-}
-
-var registries = {
-  "dockerhub": {
-    "production": {
-      "name": "microsoft",
-      "email": "matt.fisher@microsoft.com",
-      "username": "bacongobbler"
-    }
-  }
-}
-
 var testJob = new Job("test");
 testJob.image = goImage;
 testJob.mountPath = localPath;
@@ -38,7 +23,6 @@ var azureJob = new Job("azure");
 azureJob.image = goImage;
 azureJob.mountPath = localPath;
 azureJob.env = defaultGoEnv;
-
 azureJob.tasks = [
   // install azure-cli
   'apt-get update -y',
@@ -54,6 +38,18 @@ azureJob.tasks = [
   'az storage blob upload-batch --source _dist/ --destination $AZURE_STORAGE_CONTAINER --pattern *.tar.gz*'
 ];
 
+var dockerJob = new Job("docker");
+dockerJob.image = "docker:17.05.0-ce-dind";
+dockerJob.env = {
+  "REGISTRY": "docker.io/",
+  // TODO: change this back to microsoft once we are ready to ship
+  "IMAGE_PREFIX": "bacongobbler",
+}
+dockerJob.tasks = [
+  'docker login -u="$DOCKER_USER" -p="$DOCKER_PASSWORD"',
+  'make docker-build docker-push'
+];
+
 events.push = function(e) {
   testJob.env["CODECOV_TOKEN"] = e.env.CODECOV_TOKEN;
 
@@ -62,9 +58,14 @@ events.push = function(e) {
   azureJob.env["AZURE_STORAGE_KEY"] = e.env.AZURE_STORAGE_KEY;
   azureJob.env["VERSION"] = e.commit;
 
+  dockerJob.env["DOCKER_USER"] = e.env.DOCKER_USER;
+  dockerJob.env["DOCKER_PASSWORD"] = e.env.DOCKER_PASSWORD;
+  dockerJob.env["VERSION"] = e.commit;
+
   wg = new WaitGroup();
   wg.add(testJob);
   wg.add(azureJob);
+  wg.add(dockerJob);
 
   wg.jobs.forEach(function (j) {
       j.background();
