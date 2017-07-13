@@ -50,7 +50,7 @@ azureJob.tasks = [
   'cd $DEST_PATH',
   'make bootstrap',
   'make build-cross',
-  'make dist',
+  'make dist checksum',
   'az storage blob upload-batch --source _dist/ --destination $AZURE_STORAGE_CONTAINER --pattern *.tar.gz*'
 ];
 
