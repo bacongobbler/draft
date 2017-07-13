@@ -40,16 +40,22 @@ azureJob.tasks = [
 
 var dockerJob = new Job("docker");
 dockerJob.image = "docker:17.05.0-ce-dind";
+dockerJob.mountPath = localPath;
 dockerJob.env = {
+  "DEST_PATH": localPath,
   "REGISTRY": "docker.io/",
   // TODO: change this back to microsoft once we are ready to ship
   "IMAGE_PREFIX": "bacongobbler",
   "DOCKER_DRIVER": "overlay"
 }
 dockerJob.tasks = [
+  'apk add --no-cache bash git go libc-dev make nodejs',
+  'cd $DEST_PATH',
+  'make bootstrap',
   'dockerd --host=unix:///var/run/docker.sock &',
+  'make docker-build',
   'docker login -u="$DOCKER_USER" -p="$DOCKER_PASSWORD"',
-  'make docker-build docker-push'
+  'make docker-push'
 ];
 // run the docker job as a privileged container
 dockerJob.container.securityContext = {
