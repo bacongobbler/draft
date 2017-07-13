@@ -43,6 +43,7 @@ dockerJob.image = "docker:17.05.0-ce-dind";
 dockerJob.mountPath = localPath;
 dockerJob.env = {
   "DEST_PATH": localPath,
+  "GOPATH": "/go",
   "REGISTRY": "docker.io/",
   // TODO: change this back to microsoft once we are ready to ship
   "IMAGE_PREFIX": "bacongobbler",
