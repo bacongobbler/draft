@@ -44,6 +44,7 @@ dockerJob.mountPath = localPath;
 dockerJob.env = {
   "DEST_PATH": localPath,
   "GOPATH": "/go",
+  "PATH": "/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
   "REGISTRY": "docker.io/",
   // TODO: change this back to microsoft once we are ready to ship
   "IMAGE_PREFIX": "bacongobbler",
