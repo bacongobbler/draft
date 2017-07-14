@@ -10,7 +10,10 @@ var defaultGoEnv = {
 var testJob = new Job("test");
 testJob.image = goImage;
 testJob.mountPath = localPath;
-testJob.env = defaultGoEnv;
+testJob.env = {
+  "DEST_PATH": localPath,
+  "CODECOV_TOKEN": project.secrets.CODECOV_TOKEN
+};
 testJob.tasks = [
   'cd $DEST_PATH',
   'make bootstrap',
@@ -22,7 +25,12 @@ testJob.tasks = [
 var azureJob = new Job("azure");
 azureJob.image = goImage;
 azureJob.mountPath = localPath;
-azureJob.env = defaultGoEnv;
+azureJob.env = {
+  "DEST_PATH": localPath,
+  "AZURE_STORAGE_ACCOUNT": project.secrets.AZURE_STORAGE_ACCOUNT,
+  "AZURE_STORAGE_CONTAINER": project.secrets.AZURE_STORAGE_CONTAINER,
+  "AZURE_STORAGE_KEY": project.secrets.AZURE_STORAGE_KEY
+};
 azureJob.tasks = [
   // install azure-cli
   'apt-get update -y',
@@ -48,7 +56,9 @@ dockerJob.env = {
   "REGISTRY": "docker.io/",
   // TODO: change this back to microsoft once we are ready to ship
   "IMAGE_PREFIX": "bacongobbler",
-  "DOCKER_DRIVER": "overlay"
+  "DOCKER_DRIVER": "overlay",
+  "DOCKER_USER": project.secrets.DOCKER_USER,
+  "DOCKER_PASSWORD": project.secrets.DOCKER_PASSWORD
 }
 dockerJob.tasks = [
   'apk add --no-cache bash git go libc-dev make nodejs',
@@ -65,15 +75,7 @@ dockerJob.container.securityContext = {
 }
 
 events.push = function(e) {
-  testJob.env["CODECOV_TOKEN"] = e.env.CODECOV_TOKEN;
-
-  azureJob.env["AZURE_STORAGE_ACCOUNT"] = e.env.AZURE_STORAGE_ACCOUNT;
-  azureJob.env["AZURE_STORAGE_CONTAINER"] = e.env.AZURE_STORAGE_CONTAINER;
-  azureJob.env["AZURE_STORAGE_KEY"] = e.env.AZURE_STORAGE_KEY;
   azureJob.env["VERSION"] = e.commit;
-
-  dockerJob.env["DOCKER_USER"] = e.env.DOCKER_USER;
-  dockerJob.env["DOCKER_PASSWORD"] = e.env.DOCKER_PASSWORD;
   dockerJob.env["VERSION"] = e.commit;
 
   wg = new WaitGroup();
