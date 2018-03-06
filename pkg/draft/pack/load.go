@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -24,8 +25,9 @@ func FromDir(dir string) (*Pack, error) {
 
 	files, err := ioutil.ReadDir(topdir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading %s: %s", topdir, err)
 	}
+
 	for _, fInfo := range files {
 		if fInfo.IsDir() {
 			chart, err := chartutil.LoadDir(filepath.Join(topdir, fInfo.Name()))
