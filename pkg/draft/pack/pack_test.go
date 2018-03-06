@@ -16,9 +16,11 @@ const testDockerfile = `FROM nginx:latest
 
 func TestSaveDir(t *testing.T) {
 	p := &Pack{
-		Chart: &chart.Chart{
-			Metadata: &chart.Metadata{
-				Name: "chart-for-nigel-thornberry",
+		Charts: []*chart.Chart{
+			{
+				Metadata: &chart.Metadata{
+					Name: "chart-for-nigel-thornberry",
+				},
 			},
 		},
 		Files: map[string]io.ReadCloser{
@@ -38,9 +40,11 @@ func TestSaveDir(t *testing.T) {
 
 func TestSaveDirDockerfileExistsInAppDir(t *testing.T) {
 	p := &Pack{
-		Chart: &chart.Chart{
-			Metadata: &chart.Metadata{
-				Name: "chart-for-nigel-thornberry",
+		Charts: []*chart.Chart{
+			{
+				Metadata: &chart.Metadata{
+					Name: "chart-for-nigel-thornberry",
+				},
 			},
 		},
 		Files: map[string]io.ReadCloser{

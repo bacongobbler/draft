@@ -890,6 +890,10 @@
   packages = [
     "discovery",
     "dynamic",
+    "informers/apps/v1beta1",
+    "informers/core/v1",
+    "informers/extensions/v1beta1",
+    "informers/internalinterfaces",
     "informers",
     "informers/admissionregistration",
     "informers/admissionregistration/v1alpha1",
@@ -960,6 +964,9 @@
     "kubernetes/typed/storage/v1",
     "kubernetes/typed/storage/v1alpha1",
     "kubernetes/typed/storage/v1beta1",
+    "listers/apps/v1beta1",
+    "listers/core/v1",
+    "listers/extensions/v1beta1",
     "listers/admissionregistration/v1alpha1",
     "listers/admissionregistration/v1beta1",
     "listers/apps/v1",
@@ -1046,27 +1053,53 @@
     "pkg/tlsutil",
     "pkg/version"
   ]
-  revision = "b5af54d44ce282ce5110c0bd0ecacb741d0d8099"
+  revision = "8478fb4fc723885b155c924d1c8c410b7a9444e6"
+  version = "v2.7.2"
 
 [[projects]]
   branch = "master"
   name = "k8s.io/kube-openapi"
   packages = [
     "pkg/common",
-    "pkg/util/proto",
-    "pkg/util/proto/validation"
+    "pkg/util/proto"
   ]
   revision = "b16ebc07f5cad97831f961e4b5a9cc1caed33b7e"
 
 [[projects]]
   name = "k8s.io/kubernetes"
   packages = [
+    "federation/apis/federation",
+    "federation/apis/federation/install",
+    "federation/apis/federation/v1beta1",
+    "federation/client/clientset_generated/federation_clientset",
+    "federation/client/clientset_generated/federation_clientset/scheme",
+    "federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1",
+    "federation/client/clientset_generated/federation_clientset/typed/batch/v1",
+    "federation/client/clientset_generated/federation_clientset/typed/core/v1",
+    "federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1",
+    "federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1",
+    "pkg/api",
+    "pkg/api/events",
+    "pkg/api/helper",
+    "pkg/api/helper/qos",
+    "pkg/api/install",
     "pkg/api/events",
     "pkg/api/legacyscheme",
     "pkg/api/pod",
     "pkg/api/ref",
     "pkg/api/resource",
     "pkg/api/service",
+    "pkg/api/util",
+    "pkg/api/v1",
+    "pkg/api/v1/helper",
+    "pkg/api/v1/helper/qos",
+    "pkg/api/v1/pod",
+    "pkg/api/validation",
+    "pkg/apis/admissionregistration",
+    "pkg/apis/admissionregistration/install",
+    "pkg/apis/admissionregistration/v1alpha1",
+    "pkg/apis/apps",
+    "pkg/apis/apps/install",
     "pkg/api/v1/pod",
     "pkg/api/v1/service",
     "pkg/apis/admissionregistration",
@@ -1167,6 +1200,10 @@
     "pkg/controller/deployment/util",
     "pkg/controller/history",
     "pkg/controller/statefulset",
+    "pkg/credentialprovider",
+    "pkg/features",
+    "pkg/fieldpath",
+    "pkg/kubectl",
     "pkg/controller/volume/events",
     "pkg/controller/volume/persistentvolume",
     "pkg/credentialprovider",
@@ -1182,6 +1219,12 @@
     "pkg/kubectl/cmd/util/openapi/validation",
     "pkg/kubectl/plugins",
     "pkg/kubectl/resource",
+    "pkg/kubectl/util",
+    "pkg/kubectl/util/hash",
+    "pkg/kubectl/util/slice",
+    "pkg/kubectl/validation",
+    "pkg/kubelet/apis",
+    "pkg/kubelet/qos",
     "pkg/kubectl/scheme",
     "pkg/kubectl/util",
     "pkg/kubectl/util/hash",
@@ -1197,6 +1240,7 @@
     "pkg/security/apparmor",
     "pkg/serviceaccount",
     "pkg/util/file",
+    "pkg/util/hash",
     "pkg/util/goroutinemap",
     "pkg/util/goroutinemap/exponentialbackoff",
     "pkg/util/hash",
@@ -1221,10 +1265,24 @@
     "plugin/pkg/scheduler/api",
     "plugin/pkg/scheduler/schedulercache",
     "plugin/pkg/scheduler/util",
-    "plugin/pkg/scheduler/volumebinder"
+    "staging/src/k8s.io/apimachinery/pkg/util/rand"
   ]
-  revision = "d2835416544f298c919e2ead3be3d0864b52323b"
-  version = "v1.9.3"
+  revision = "0b9efaeb34a2fc51ff8e4d34ad9bc6375459c4a4"
+  version = "v1.8.0"
+
+[[projects]]
+  branch = "master"
+  name = "k8s.io/metrics"
+  packages = [
+    "pkg/apis/metrics",
+    "pkg/apis/metrics/v1alpha1",
+    "pkg/apis/metrics/v1beta1",
+    "pkg/client/clientset_generated/clientset",
+    "pkg/client/clientset_generated/clientset/scheme",
+    "pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+    "pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
+  ]
+  revision = "e13e1c0d9b9fbfd2e31e8573430df521f8d59788"
 
 [[projects]]
   branch = "master"
@@ -1241,6 +1299,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fb1e0e43e387ccc7bc94d43a077b57a9e19ea5df3117058032e7a6cfaa337197"
+  inputs-digest = "e598e395392d2ba1f7a23155fda00ea3ed10ed370e7b05b5bb2f98c2ef1c5219"
   solver-name = "gps-cdcl"
   solver-version = 1
