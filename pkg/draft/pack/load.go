@@ -1,7 +1,6 @@
 package pack
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -23,19 +22,18 @@ func FromDir(dir string) (*Pack, error) {
 		return nil, err
 	}
 
-	pack.Chart, err = chartutil.LoadDir(filepath.Join(topdir, ChartsDir))
+	files, err := ioutil.ReadDir(topdir)
 	if err != nil {
 		return nil, err
 	}
-
-	files, err := ioutil.ReadDir(topdir)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %s", topdir, err)
-	}
-
-	// load all files in the lowest level of the pack directory
 	for _, fInfo := range files {
-		if !fInfo.IsDir() {
+		if fInfo.IsDir() {
+			chart, err := chartutil.LoadDir(filepath.Join(topdir, fInfo.Name()))
+			if err != nil {
+				return nil, err
+			}
+			pack.Charts = append(pack.Charts, chart)
+		} else {
 			f, err := os.Open(filepath.Join(topdir, fInfo.Name()))
 			if err != nil {
 				return nil, err

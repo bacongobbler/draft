@@ -41,7 +41,7 @@ const (
 // Pack defines a Draft Starter Pack.
 type Pack struct {
 	// Chart is the Helm chart to be installed with the Pack.
-	Chart *chart.Chart
+	Charts []*chart.Chart
 	// Files are the files inside the Pack that will be installed.
 	Files map[string]io.ReadCloser
 }
@@ -53,8 +53,10 @@ func (p *Pack) SaveDir(dest string) error {
 	if err := os.Mkdir(chartPath, 0755); err != nil {
 		return fmt.Errorf("Could not create %s: %s", chartPath, err)
 	}
-	if err := chartutil.SaveDir(p.Chart, chartPath); err != nil {
-		return err
+	for _, chart := range p.Charts {
+		if err := chartutil.SaveDir(chart, chartPath); err != nil {
+			return err
+		}
 	}
 
 	// save the rest of the files
