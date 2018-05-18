@@ -1,4 +1,4 @@
-# Getting Started
+# Deploying a "Hello World!" app with Draft
 
 This document shows how to deploy a "Hello World" app with Draft. If you haven't done so already, be sure you have Draft installed according to the [Installation Guide][Installation Guide].
 

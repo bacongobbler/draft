@@ -7,7 +7,7 @@ it up-to-date.
 
 So you're in charge of a new release for Draft? Cool. Here's what to do...
 
-![TODO: Nothing](../img/nothing.png)
+![TODO: Nothing](../static/img/nothing.png)
 
 Just kidding! :trollface:
 
