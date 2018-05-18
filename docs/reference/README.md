@@ -1,6 +1,6 @@
 # Index of Draft Enhancement Proposals
 
-This DEP contains the index of all Draft Enhancement Proposals, known as DEPs. DEP numbers are ordered numerically, and once merged to git are never changed. The git history of the DEP texts represent their historical record.
+This contains the index of all Draft Enhancement Proposals, known as DEPs. DEP numbers are ordered numerically, and once merged to git are never changed. The git history of the DEP texts represent their historical record.
 
 # Numerical Index
 

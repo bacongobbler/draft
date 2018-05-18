@@ -1,4 +1,4 @@
-# Cloud installations and Advanced Configuration
+# Cloud Installation and Advanced Configuration
 
 In certain situations, users are given a Kubernetes cluster with security constraints such as
 
