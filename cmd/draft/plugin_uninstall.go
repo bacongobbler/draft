@@ -69,7 +69,7 @@ func (pcmd *pluginUninstallCmd) run() error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(pcmd.out, "Uninstalling %s...\n", plugin)
+		fmt.Fprintf(pcmd.out, "Uninstalling %s...\n", plugin.Name)
 		start := time.Now()
 		if err := plugin.Uninstall(pHome); err != nil {
 			return err
