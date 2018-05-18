@@ -36,6 +36,7 @@ func newPluginCmd(out io.Writer) *cobra.Command {
 		Long:  pluginHelp,
 	}
 	cmd.AddCommand(
+		newPluginCreateCmd(out),
 		newPluginInstallCmd(out),
 		newPluginListCmd(out),
 		newPluginRepositoryCmd(out),
