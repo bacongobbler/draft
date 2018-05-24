@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Azure/draft/pkg/draft"
 	"github.com/Azure/draft/pkg/draft/draftpath"
 	"github.com/Azure/draft/pkg/local"
 )
@@ -69,7 +70,7 @@ func newConnectCmd(out io.Writer) *cobra.Command {
 }
 
 func (cn *connectCmd) run(runningEnvironment string) (err error) {
-	deployedApp, err := local.DeployedApplication(draftToml, runningEnvironment)
+	deployedApp, err := local.DeployedApplication(draft.DraftTomlFilename, runningEnvironment)
 	if err != nil {
 		return err
 	}

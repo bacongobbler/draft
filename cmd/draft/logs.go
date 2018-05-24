@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Azure/draft/pkg/draft"
 	"github.com/Azure/draft/pkg/draft/draftpath"
 	"github.com/Azure/draft/pkg/local"
 	"github.com/hpcloud/tail"
@@ -40,7 +41,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 		Long:    logsDesc,
 		PreRunE: lc.complete,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			deployedApp, err := local.DeployedApplication(draftToml, runningEnvironment)
+			deployedApp, err := local.DeployedApplication(draft.DraftTomlFilename, runningEnvironment)
 			if err != nil {
 				return err
 			}

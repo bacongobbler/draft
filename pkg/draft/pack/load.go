@@ -6,8 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-
-	"k8s.io/helm/pkg/chartutil"
 )
 
 // FromDir takes a string name, tries to resolve it to a file or directory, and then loads it.
@@ -19,11 +17,6 @@ func FromDir(dir string) (*Pack, error) {
 	pack.Files = make(map[string]io.ReadCloser)
 
 	topdir, err := filepath.Abs(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	pack.Chart, err = chartutil.LoadDir(filepath.Join(topdir, ChartsDir))
 	if err != nil {
 		return nil, err
 	}

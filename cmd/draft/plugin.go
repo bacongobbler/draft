@@ -84,6 +84,11 @@ func loadPlugins(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, in 
 			continue
 		}
 
+		if strings.HasPrefix(p.Name, "generator-") {
+			log.Debugf("command %s is a generator, skipping", plug.Metadata.Name)
+			continue
+		}
+
 		c := &cobra.Command{
 			Use:   p.Name,
 			Short: p.Description,
@@ -181,9 +186,9 @@ func setupPluginEnv(shortname, base, plugdirs string, home draftpath.Home) {
 
 		// Set vars that may not have been set, and save client the
 		// trouble of re-parsing.
-		pluginEnvVar: pluginDirPath(home),
-		homeEnvVar:   home.String(),
-		hostEnvVar:   tillerHost,
+		pluginEnvVar:         pluginDirPath(home),
+		draftpath.HomeEnvVar: home.String(),
+		hostEnvVar:           tillerHost,
 		// Set vars that convey common information.
 		"DRAFT_PACKS_HOME": home.Packs(),
 	} {

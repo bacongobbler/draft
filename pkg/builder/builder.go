@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Azure/draft/pkg/draft"
 	"github.com/Azure/draft/pkg/draft/manifest"
-	"github.com/Azure/draft/pkg/draft/pack"
 	"github.com/Azure/draft/pkg/local"
 	"github.com/Azure/draft/pkg/osutil"
 	"github.com/Azure/draft/pkg/storage"
@@ -219,13 +219,13 @@ func loadArchive(ctx *Context) (err error) {
 
 	// if a chart was specified in manifest, use it
 	if ctx.Env.Chart != "" {
-		ctx.Chart, err = chartutil.Load(filepath.Join(ctx.AppDir, pack.ChartsDir, ctx.Env.Chart))
+		ctx.Chart, err = chartutil.Load(filepath.Join(ctx.AppDir, draft.ChartsDir, ctx.Env.Chart))
 		if err != nil {
 			return err
 		}
 	} else {
 		// otherwise, find the first directory in chart/ and assume that is the chart we want to deploy.
-		chartDir := filepath.Join(ctx.AppDir, pack.ChartsDir)
+		chartDir := filepath.Join(ctx.AppDir, draft.ChartsDir)
 		files, err := ioutil.ReadDir(chartDir)
 		if err != nil {
 			return err

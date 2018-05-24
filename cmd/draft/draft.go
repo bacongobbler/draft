@@ -25,7 +25,6 @@ import (
 )
 
 const (
-	homeEnvVar      = "DRAFT_HOME"
 	hostEnvVar      = "HELM_HOST"
 	namespaceEnvVar = "TILLER_NAMESPACE"
 )
@@ -50,10 +49,10 @@ var globalUsage = `The application deployment tool for Kubernetes.
 `
 
 func init() {
-	rootCmd = newRootCmd(os.Stdout, os.Stdin)
+	rootCmd = newRootCmd(os.Stdout, os.Stdin, os.Stderr)
 }
 
-func newRootCmd(out io.Writer, in io.Reader) *cobra.Command {
+func newRootCmd(stdout io.Writer, stdin io.Reader, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "draft",
 		Short:        globalUsage,
@@ -63,7 +62,7 @@ func newRootCmd(out io.Writer, in io.Reader) *cobra.Command {
 			if flagDebug {
 				log.SetLevel(log.DebugLevel)
 			}
-			os.Setenv(homeEnvVar, draftHome)
+			os.Setenv(draftpath.HomeEnvVar, draftHome)
 			globalConfig, err = ReadConfig()
 			return
 		},
@@ -75,28 +74,33 @@ func newRootCmd(out io.Writer, in io.Reader) *cobra.Command {
 	p.StringVar(&tillerNamespace, "tiller-namespace", defaultTillerNamespace(), "namespace where Tiller is running. This is used when Tiller was installed in a different namespace than kube-system. Overrides $TILLER_NAMESPACE")
 
 	cmd.AddCommand(
-		newConfigCmd(out),
-		newCreateCmd(out),
-		newHomeCmd(out),
-		newInitCmd(out, in),
-		newUpCmd(out),
-		newVersionCmd(out),
-		newPluginCmd(out),
-		newConnectCmd(out),
-		newDeleteCmd(out),
-		newLogsCmd(out),
-		newHistoryCmd(out),
-		newPackCmd(out),
+		newConfigCmd(stdout),
+		newGenerateCmd(stdout),
+		newHomeCmd(stdout),
+		newInitCmd(stdout, stdin),
+		newNewCmd(stdout),
+		newUpCmd(stdout),
+		newVersionCmd(stdout),
+		newPluginCmd(stdout),
+		newConnectCmd(stdout),
+		newDeleteCmd(stdout),
+		newLogsCmd(stdout),
+		newHistoryCmd(stdout),
+		newPackCmd(stdout),
+		newTaskCmd(stdout, stdin, stderr),
 	)
 
 	// Find and add plugins
-	loadPlugins(cmd, draftpath.Home(homePath()), out, in)
+	loadPlugins(cmd, draftpath.Home(homePath()), stdout, stdin)
+
+	// Find and add generators
+	loadGenerators(cmd, draftpath.Home(homePath()), stdout, stdin)
 
 	return cmd
 }
 
 func defaultDraftHome() string {
-	if home := os.Getenv(homeEnvVar); home != "" {
+	if home := os.Getenv(draftpath.HomeEnvVar); home != "" {
 		return home
 	}
 

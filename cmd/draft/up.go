@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -27,9 +26,7 @@ import (
 	dockercontainerbuilder "github.com/Azure/draft/pkg/builder/docker"
 	"github.com/Azure/draft/pkg/cmdline"
 	"github.com/Azure/draft/pkg/draft/draftpath"
-	"github.com/Azure/draft/pkg/local"
 	"github.com/Azure/draft/pkg/storage/kube/configmap"
-	"github.com/Azure/draft/pkg/tasks"
 )
 
 const upDesc = `
@@ -217,19 +214,6 @@ func (u *upCmd) run(environment string) (err error) {
 		return fmt.Errorf("Could not get a helm client: %s", err)
 	}
 
-	taskList, err := tasks.Load(tasksTOMLFile)
-	if err != nil {
-		if err == tasks.ErrNoTaskFile {
-			debug(err.Error())
-		} else {
-			return err
-		}
-	} else {
-		if _, err = taskList.Run(tasks.PreUp, ""); err != nil {
-			return err
-		}
-	}
-
 	// setup the storage engine
 	bldr.Storage = configmap.NewConfigMaps(bldr.Kube.CoreV1().ConfigMaps(tillerNamespace))
 	progressC := bldr.Up(ctx, buildctx)
@@ -238,41 +222,6 @@ func (u *upCmd) run(environment string) (err error) {
 	if buildctx.Env.AutoConnect || autoConnect {
 		c := newConnectCmd(u.out)
 		return c.RunE(c, []string{})
-	}
-
-	if err := runPostDeployTasks(taskList, bldr.ID); err != nil {
-		debug(err.Error())
-		return nil
-	}
-
-	return nil
-}
-
-func runPostDeployTasks(taskList *tasks.Tasks, buildID string) error {
-	if taskList == nil || len(taskList.PostDeploy) == 0 {
-		return errors.New("No post deploy tasks to run")
-	}
-
-	app, err := local.DeployedApplication(draftToml, runningEnvironment)
-	if err != nil {
-		return err
-	}
-
-	client, _, err := getKubeClient(kubeContext)
-	if err != nil {
-		return err
-	}
-
-	names, err := app.GetPodNames(buildID, client)
-	if err != nil {
-		return err
-	}
-
-	for _, name := range names {
-		_, err := taskList.Run(tasks.PostDeploy, name)
-		if err != nil {
-			debug("error running task: %v", err)
-		}
 	}
 
 	return nil

@@ -36,9 +36,9 @@ The `mysite` directory has a number of auto-generated files and folders that mak
 | lib/        | Extended modules for your application.                                                                                                                     |
 | log/        | Application log files.                                                                                                                                     |
 | static/     | The only folder seen by the world as-is. Contains static files and compiled assets.                                                                        |
-| Taskfile    | This file locates and loads tasks that can be run from the command line. This is covered in mode detail in [Configuring Draft Tasks][].                    |
+| Drakefile   | Stands for "Draft Makefile". Locates and loads tasks that can be run from the command line. This is covered in mode detail in [Configuring Draft Tasks][]. |
 | README.md   | This is a brief instruction manual for your application. You should edit this file to tell others what your application does, how to set it up, and so on. |
-| tests/      | Unit tests, fixtures, and other test apparatus. These are covered in [Testing Draft Applications][].
+| test/       | Unit tests, fixtures, and other test apparatus. These are covered in [Testing Draft Applications][].
 
 ## Hello, Draft!
 
@@ -84,7 +84,7 @@ There's an additional unused component called a service. What a service represen
 
 To create a new controller, you will need to run the "generate" task and tell it you want a controller called "hello".
 
-Make sure you’re in the same directory as your Taskfile and type this command:
+Make sure you’re in the same directory as your Drakefile and type this command:
 
 ```shell
 $ draft create controller hello --language python

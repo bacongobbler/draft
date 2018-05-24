@@ -1,8 +1,12 @@
 package draftpath
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 )
+
+const HomeEnvVar = "DRAFT_HOME"
 
 // Home describes the location of a CLI configuration.
 //
@@ -41,4 +45,18 @@ func (h Home) Plugins() string {
 // Implements fmt.Stringer.
 func (h Home) String() string {
 	return string(h)
+}
+
+// DefaultHome gives the default value for $(draft home)
+func DefaultHome() string {
+	if home := os.Getenv(HomeEnvVar); home != "" {
+		return home
+	}
+
+	homeEnvPath := os.Getenv("HOME")
+	if homeEnvPath == "" && runtime.GOOS == "windows" {
+		homeEnvPath = os.Getenv("USERPROFILE")
+	}
+
+	return filepath.Join(homeEnvPath, ".draft")
 }
