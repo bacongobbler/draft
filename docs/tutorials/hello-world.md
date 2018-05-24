@@ -1,137 +1,129 @@
 # Deploying a "Hello World!" app with Draft
 
-This document shows how to deploy a "Hello World" app with Draft. If you haven't done so already, be sure you have Draft installed according to the [Installation Guide][Installation Guide].
+Let’s learn by example. In this tutorial, we’ll walk you through the creation of a basic Python application.
 
-## App setup
-
-There are multiple example applications included within the [examples directory](../examples). For this walkthrough, we'll be using the [python example application](../examples/example-python) which uses [Flask](http://flask.pocoo.org/) to provide a very simple Hello World webserver.
+We’ll assume you have Draft installed already. You can tell Draft is installed and which version by running the following command in a shell prompt (indicated by the $ prefix):
 
 ```shell
-$ cd examples/example-python
+$ draft version
 ```
 
-## Draft Create
+## Creating a Project
 
-We need some "scaffolding" to deploy our app into a [Kubernetes](https://kubernetes.io/) cluster. Draft can create a [Helm](https://helm.sh/) chart, a `Dockerfile` and a `draft.toml` with `draft create`:
+If this is your first time using Draft, you’ll have to take care of some initial setup. Namely, you’ll need to auto-generate some code that establishes a Draft project – a collection of settings for an instance of Draft, including database configuration, Draft-specific options and project-specific settings.
+
+From the command line, `cd` into a directory where you’d like to store your code, then run the following command:
 
 ```shell
-$ draft create
---> Draft detected the primary language as Python with 97.267760% certainty.
+$ draft new mysite
 --> Ready to sail
-$ ls -a
-.draftignore  Dockerfile  app.py  chart/  draft.toml  requirements.txt
 ```
 
-The `chart/` and `Dockerfile` assets created by Draft default to a basic Python configuration. This `Dockerfile` harnesses the [python:onbuild](https://hub.docker.com/_/python/) image, which will install the dependencies in `requirements.txt` and copy the current directory into `/usr/src/app`. And to align with the service values in `chart/values.yaml`, this Dockerfile exposes port 80 from the container.
+This will create a `mysite` directory in your current directory.
 
-The `draft.toml` file contains basic configuration about the application like the name, the repository, which namespace it will be deployed to, and whether to deploy the app automatically when local files change.
+After you create the `mysite` project, switch to its folder:
 
 ```shell
-$ cat draft.toml
-[environments]
-  [environments.development]
-    name = "example-python"
-    namespace = "default"
-    wait = true
-    watch = false
-    watch-delay = 2
-    override-ports = ["8080:8080", "9229:9229"]
-    auto-connect = false    
+$ cd mysite
 ```
 
-See [DEP 6](reference/dep-006.md) for more information and available configuration on the `draft.toml`.
+The `mysite` directory has a number of auto-generated files and folders that make up the structure of a Draft application. Here's a basic rundown on the function of each of the files and folders that Draft created by default:
 
-A `.draftignore` file is created as well for elements we want to exclude tracking on `draft up` when watching for changes. The syntax is identical to [helm's .helmignore file](https://github.com/kubernetes/helm/blob/master/pkg/repo/repotest/testdata/examplechart/.helmignore).
+| File/Folder | Purpose                                                                                                                                                    |
+|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| bin/        | Contains the Draft scripts that starts your application and can contain other scripts you use to setup, update, deploy or run your app.                    |
+| config/     | Configure your project's routes, database, and more. This is covered in more detail in [Configuring Draft Projects][].                                     |
+| lib/        | Extended modules for your application.                                                                                                                     |
+| log/        | Application log files.                                                                                                                                     |
+| static/     | The only folder seen by the world as-is. Contains static files and compiled assets.                                                                        |
+| Taskfile    | This file locates and loads tasks that can be run from the command line. This is covered in mode detail in [Configuring Draft Tasks][].                    |
+| README.md   | This is a brief instruction manual for your application. You should edit this file to tell others what your application does, how to set it up, and so on. |
+| tests/      | Unit tests, fixtures, and other test apparatus. These are covered in [Testing Draft Applications][].
 
-## Draft Up
+## Hello, Draft!
 
-Now we're ready to deploy this app to a Kubernetes cluster. Draft handles these tasks with one `draft up` command:
+To begin with, let's get some text up on our screen quickly. To do this, you need to get your Draft application server running.
 
-- reads configuration from `draft.toml`
-- compresses the `chart/` directory and the application directory as two separate tarballs
-- builds the image using `docker`
-- `docker` pushes the image to the registry specified in `draft.toml` (or in `draft config get registry`, if set)
-- `draft` instructs helm to install the chart, referencing the image just built
+### Fire up a Web Server
+
+When you ran `draft new`, you actually have a functional Draft application ready to deploy to Kubernetes. To see it, you need to fire up a web server on your development machine. You can do this by running the following in the `mysite` directory:
 
 ```shell
 $ draft up
-Draft Up Started: 'example-python'
-example-python: Building Docker Image: SUCCESS ⚓  (73.0991s)
-example-python: Pushing Docker Image: SUCCESS ⚓  (69.1425s)
-example-python: Releasing Application: SUCCESS ⚓  (0.6875s)
-example-python: Build ID: 01BSY5R8J45QHG9D3B17PAXMGN
+Draft Up Started: 'mysite': 01CDXCTNQAV00SVGWAM1782N16
+mysite: Building Docker Image: SUCCESS ⚓  (38.0044s)
+mysite: Releasing Application: SUCCESS ⚓  (2.1914s)
+Inspect the logs with `draft logs 01CDXCTNQAV00SVGWAM1782N16`
 ```
 
-## Interact with the Deployed App
+### Interact with the Deployed App
 
 Now that the application has been deployed, we can connect to our app.
 
 ```shell
 $ draft connect
-Connect to python:8080 on localhost:8080
+Connect to mysite:8080 on localhost:8080
 172.17.0.1 - - [13/Sep/2017 19:10:09] "GET / HTTP/1.1" 200 -
 ```
 
-`draft connect` is the command used to interact with the application deployed on your cluster. It works by creating proxy connections to the ports exposed by the containers in your pod, while also streaming the logs from all containers.
+To see your application in action, open a browser window and navigate to http://localhost:8080. You should see the Draft logo:
 
-In another terminal window, we can connect to our app using the address displayed from `draft connect`'s output.
-
-```shell
-$ curl localhost:8080
-Hello, World!
-```
+![Draft default hello world page](../static/img/draft-helloworld.png)
 
 Once you're done playing with this app, cancel out of the `draft connect` session using CTRL+C.
 
-> Note that you can use the flag `draft up --auto-connect` in order to have the application automatically connect once the deployment is done.
+### Say "Hello, Draft!"
 
-> You can customize the local ports for the `draft connect` command either through the `-p` flag or through the `override-ports` field in `draft.toml`. More info in [dep-007.md][dep007]
+To get Draft saying "Hello", you need to create at minimum a controller and a route.
 
-## Update the App
+A controller is the business logic layer. Each controller you write with Draft consists of a "micro-service" in the language of your choice that follows a certain convention. Draft comes with a utility that automatically generates the basic directory structure of an app, so you can focus on writing code rather than creating directories.
 
-Now, let's change the output in `app.py` to output "Hello, Draft!" instead:
+A route's purpose is to route requests to controllers. An important distinction to make is that it is the controller, not the route, where information is collected. The route justs displays that information.
+
+There's an additional unused component called a service. What a service represents can vary by type; it could be a database, a cluster, or even just an account from a SaaS (software-as-a-service) offering. While it isn't necessary for the sake of a barebones "Hello World" app, it's important to point out how controllers can store state.
+
+To create a new controller, you will need to run the "generate" task and tell it you want a controller called "hello".
+
+Make sure you’re in the same directory as your Taskfile and type this command:
 
 ```shell
-$ cat <<EOF > app.py
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route("/")
-def hello():
-    return "Hello, Draft!\n"
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)
-EOF
+$ draft create controller hello --language python
+--> Ready to sail
 ```
 
-## Draft Up(grade)
+That’ll create a directory `hello`, which is laid out like this:
 
-When we call `draft up` again, Draft determines that the Helm release already exists and will perform a `helm upgrade` rather than attempting another `helm install`:
+```shell
+hello/
+    app.py
+    Dockerfile
+```
+
+This directory structure will house the `hello` application.
+
+### Writing our First Route
+
+Now that we have made the controller, we need to tell Draft where we want "Hello, Draft!" to show up. In our case, we want it to show up when we navigate to the root URL of our site, http://localhost:8080. At the moment, the Draft welcome page is occupying that spot.
+
+We'll have to tell Draft where your actual home page is located.
+
+Open the file `config/routes` in your editor.
+
+```
+GET     /   hello   8080    /
+```
+
+This is your application's routing file which holds entries in a special DSL (domain-specific language) that tells Draft how to connect incoming requests to controllers.
+
+When we call `draft up` and `draft connect` again, you'll see the "Hello, Draft!" message you put into `hello/app.py`, indicating that this new route is indeed going to the `hello` controller.
 
 ```shell
 $ draft up
-Draft Up Started: 'example-python'
-example-python: Building Docker Image: SUCCESS ⚓  (13.0127s)
-example-python: Pushing Docker Image: SUCCESS ⚓  (16.0272s)
-example-python: Releasing Application: SUCCESS ⚓  (0.5533s)
-example-python: Build ID: 01BSYA4MW4BDNAPG6VVFWEPTH8
+Draft Up Started: 'mysite': 01BSYA4MW4BDNAPG6VVFWEPTH8
+hello: Building Docker Image: SUCCESS ⚓  (4.0044s)
+mysite: Releasing Application: SUCCESS ⚓  (1.1914s)
+Inspect the logs with `draft logs 01BSYA4MW4BDNAPG6VVFWEPTH8`
+$ draft connect
+Connect to mysite:8080 on localhost:8080
+172.17.0.1 - - [13/Sep/2017 19:10:09] "GET / HTTP/1.1" 200 -
 ```
-
-We should notice a significant faster build time here. This is because Docker is caching unchanged layers and only compiling layers that need to be re-built in the background.
-
-## Great Success!
-
-Now when we run `draft connect` and open the local URL using `curl` or our browser, we can see our app has been updated!
-
-```shell
-$ curl localhost:8080
-Hello, Draft!
-```
-
-[Installation Guide]: ../README.md#installation
-[Helm]: https://github.com/kubernetes/helm
-[Kubernetes]: https://kubernetes.io/
-[Python]: https://www.python.org/
-[dep007]: reference/dep-007.md
