@@ -21,8 +21,8 @@ food = {
     name = name,
     description = "enter description here",
     homepage = "https://github.com/Azure/draft",
-	version = version,
-	useTunnel = false,
+    version = version,
+    useTunnel = false,
     packages = {
         {
             os = "darwin",
