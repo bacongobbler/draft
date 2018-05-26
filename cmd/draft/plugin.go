@@ -102,7 +102,7 @@ func loadPlugins(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, in 
 				// Call setupEnv before PrepareCommand because
 				// PrepareCommand uses os.ExpandEnv and expects the
 				// setupEnv vars.
-				setupPluginEnv(plug, filepath.Join(pHome.Installed(), p.Name, p.Version), plugdir, draftpath.Home(homePath()))
+				setupPluginEnv(p.Name, filepath.Join(pHome.Installed(), p.Name, p.Version), draftpath.Home(homePath()))
 				main := filepath.Join(os.Getenv("DRAFT_PLUGIN_DIR"), p.GetPackage(runtime.GOOS, runtime.GOARCH).Path)
 
 				prog := exec.Command(main, u...)
@@ -177,7 +177,7 @@ func manuallyProcessArgs(args []string) ([]string, []string) {
 // setupPluginEnv prepares os.Env for plugins. It operates on os.Env because
 // the plugin subsystem itself needs access to the environment variables
 // created here.
-func setupPluginEnv(shortname, base, plugdirs string, home draftpath.Home) {
+func setupPluginEnv(shortname, base string, home draftpath.Home) {
 	// Set extra env vars:
 	for key, val := range map[string]string{
 		"DRAFT_PLUGIN_NAME": shortname,

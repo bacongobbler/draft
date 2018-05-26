@@ -45,7 +45,7 @@ func loadGenerators(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, 
 	plugdir := pluginDirPath(home)
 	pHome := plugin.Home(plugdir)
 	// Now we create commands for all of these.
-	for _, plug := range findPlugins(pHome) {
+	for _, plug := range findInstalledPlugins(pHome) {
 		p, _, err := getPlugin(plug, pHome)
 		if err != nil {
 			log.Debugf("could not load plugin %s: %v", p, err)
@@ -62,13 +62,14 @@ func loadGenerators(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, 
 			continue
 		}
 
-		if strings.HasPrefix(p.Name, "generator-") {
-			log.Debugf("command %s is a generator, skipping", p.Name)
+		if !strings.HasPrefix(p.Name, "generator-") {
+			log.Debugf("command %s is not a generator, skipping", p.Name)
 			continue
 		}
 
+		generatorName := strings.TrimPrefix(p.Name, "generator-")
 		c := &cobra.Command{
-			Use:   p.Name,
+			Use:   generatorName,
 			Short: p.Description,
 			RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -80,7 +81,7 @@ func loadGenerators(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, 
 				// Call setupEnv before PrepareCommand because
 				// PrepareCommand uses os.ExpandEnv and expects the
 				// setupEnv vars.
-				setupPluginEnv(plug, filepath.Join(pHome.Installed(), p.Name, p.Version), plugdir, draftpath.Home(homePath()))
+				setupPluginEnv(generatorName, filepath.Join(pHome.Installed(), p.Name, p.Version), draftpath.Home(homePath()))
 				main := filepath.Join(os.Getenv("DRAFT_PLUGIN_DIR"), p.GetPackage(runtime.GOOS, runtime.GOARCH).Path)
 
 				prog := exec.Command(main, u...)
