@@ -37,7 +37,7 @@ func (pcmd *pluginUpgradeCmd) run(args []string) error {
 	if len(args) > 0 {
 		pluginNames = args
 	} else {
-		pluginNames = findPlugins(pHome)
+		pluginNames = findInstalledPlugins(pHome)
 	}
 	for _, name := range pluginNames {
 		plugin, _, err := getPlugin(name, pHome)

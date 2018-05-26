@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"path"
 
 	"github.com/Azure/draft/pkg/draft/draftpath"
 
@@ -35,8 +36,8 @@ func (pcmd *pluginListCmd) run(args []string) error {
 	pHome := plugin.Home(pcmd.home.Plugins())
 	if len(args) == 0 {
 		table.AddRow("NAME")
-		for _, plugin := range findPlugins(pHome) {
-			table.AddRow(plugin)
+		for _, plugin := range findInstalledPlugins(pHome) {
+			table.AddRow(path.Base(plugin))
 		}
 	} else {
 		table.AddRow("NAME", "VERSION")

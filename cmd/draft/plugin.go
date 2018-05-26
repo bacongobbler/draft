@@ -67,7 +67,7 @@ func loadPlugins(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, in 
 	plugdir := pluginDirPath(home)
 	pHome := plugin.Home(plugdir)
 	// Now we create commands for all of these.
-	for _, plug := range findPlugins(pHome) {
+	for _, plug := range findInstalledPlugins(pHome) {
 		p, _, err := getPlugin(plug, pHome)
 		if err != nil {
 			log.Debugf("could not load plugin %s: %v", p, err)
@@ -226,9 +226,10 @@ func getPlugin(pluginName string, home plugin.Home) (*plugin.Plugin, string, err
 	return &plugin, repo, nil
 }
 
-// findPlugins returns a list of installed plugins.
-func findPlugins(home plugin.Home) []string {
-	var plugins []string
+// findInstalledPlugins returns a list of installed plugins.
+func findInstalledPlugins(home plugin.Home) []string {
+	knownPlugins := search([]string{}, home)
+	var installedPlugins []string
 	files, err := ioutil.ReadDir(home.Installed())
 	if err != nil {
 		return []string{}
@@ -241,11 +242,20 @@ func findPlugins(home plugin.Home) []string {
 				continue
 			}
 			if len(files) > 0 {
-				plugins = append(plugins, f.Name())
+				installedPlugins = append(installedPlugins, f.Name())
 			}
 		}
 	}
-	return plugins
+	// expand the name of the installed plugin to its fullname
+	for i := range installedPlugins {
+		for j := range knownPlugins {
+			if strings.HasSuffix(knownPlugins[j], installedPlugins[i]) {
+				installedPlugins[i] = knownPlugins[j]
+			}
+		}
+	}
+	sort.Strings(installedPlugins)
+	return installedPlugins
 }
 
 // findPluginVersions returns a list of all installed versions of a given plugin.
