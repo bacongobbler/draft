@@ -5,12 +5,15 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/Azure/draft/pkg/draft/draftpath"
+	"github.com/Azure/draft/pkg/plugin"
 )
 
 const (
@@ -35,44 +38,38 @@ func newGenerateCmd(out io.Writer) *cobra.Command {
 // are prefixed with `generator-` and are loaded under `draft generate <name>`
 // rather than `draft <name>`.
 func loadGenerators(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, in io.Reader) {
-	plugdirs := pluginDirPath(home)
-
-	found, err := findPlugins(plugdirs)
+	generateCmd, _, err := baseCmd.Find([]string{"generate"})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load plugins: %s", err)
-		return
+		panic(err)
 	}
-
+	plugdir := pluginDirPath(home)
+	pHome := plugin.Home(plugdir)
 	// Now we create commands for all of these.
-	for _, plug := range found {
-		var commandExists bool
-		generateCmd, _, err := baseCmd.Find([]string{"generate"})
+	for _, plug := range findPlugins(pHome) {
+		p, _, err := getPlugin(plug, pHome)
 		if err != nil {
-			panic(err)
+			log.Debugf("could not load plugin %s: %v", p, err)
+			continue
 		}
+		var commandExists bool
 		for _, command := range generateCmd.Commands() {
-			if strings.Compare(command.Use, plug.Metadata.Usage) == 0 {
+			if strings.Compare(command.Short, p.Description) == 0 {
 				commandExists = true
 			}
 		}
 		if commandExists {
-			log.Debugf("command %s exists", plug.Metadata.Usage)
+			log.Debugf("command %s exists", p.Name)
 			continue
 		}
-		if !strings.HasPrefix(plug.Metadata.Name, "generator-") {
-			log.Debugf("command %s is NOT a generator, skipping", plug.Metadata.Name)
+
+		if strings.HasPrefix(p.Name, "generator-") {
+			log.Debugf("command %s is a generator, skipping", p.Name)
 			continue
-		}
-		plug := plug
-		md := plug.Metadata
-		if md.Usage == "" {
-			md.Usage = fmt.Sprintf("the %q generator", md.Name)
 		}
 
 		c := &cobra.Command{
-			Use:   md.Name,
-			Short: md.Usage,
-			Long:  md.Description,
+			Use:   p.Name,
+			Short: p.Description,
 			RunE: func(cmd *cobra.Command, args []string) error {
 
 				k, u := manuallyProcessArgs(args)
@@ -83,10 +80,10 @@ func loadGenerators(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, 
 				// Call setupEnv before PrepareCommand because
 				// PrepareCommand uses os.ExpandEnv and expects the
 				// setupEnv vars.
-				setupPluginEnv(md.Name, plug.Metadata.Version, plug.Dir, plugdirs, draftpath.Home(homePath()))
-				main, argv := plug.PrepareCommand(u)
+				setupPluginEnv(plug, filepath.Join(pHome.Installed(), p.Name, p.Version), plugdir, draftpath.Home(homePath()))
+				main := filepath.Join(os.Getenv("DRAFT_PLUGIN_DIR"), p.GetPackage(runtime.GOOS, runtime.GOARCH).Path)
 
-				prog := exec.Command(main, argv...)
+				prog := exec.Command(main, u...)
 				prog.Env = os.Environ()
 				prog.Stdout = out
 				prog.Stderr = os.Stderr
@@ -96,11 +93,12 @@ func loadGenerators(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, 
 			// This passes all the flags to the subcommand.
 			DisableFlagParsing: true,
 		}
-		if md.UseTunnel {
+
+		if p.UseTunnel {
 			c.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 				// Parse the parent flag, but not the local flags.
 				k, _ := manuallyProcessArgs(args)
-				if err := c.Parent().ParseFlags(k); err != nil {
+				if err := cmd.Parent().ParseFlags(k); err != nil {
 					return err
 				}
 				client, config, err := getKubeClient(kubeContext)
@@ -117,6 +115,6 @@ func loadGenerators(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, 
 			}
 		}
 
-		baseCmd.AddCommand(c)
+		generateCmd.AddCommand(c)
 	}
 }

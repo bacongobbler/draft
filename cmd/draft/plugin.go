@@ -85,7 +85,7 @@ func loadPlugins(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, in 
 		}
 
 		if strings.HasPrefix(p.Name, "generator-") {
-			log.Debugf("command %s is a generator, skipping", plug.Metadata.Name)
+			log.Debugf("command %s is a generator, skipping", p.Name)
 			continue
 		}
 
