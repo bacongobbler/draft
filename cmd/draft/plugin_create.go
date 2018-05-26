@@ -29,18 +29,21 @@ food = {
             arch = "amd64",
             url = "",
             sha256 = "",
+            path = name,
         },
         {
             os = "linux",
             arch = "amd64",
             url = "",
             sha256 = "",
+            path = name,
         },
         {
             os = "windows",
             arch = "amd64",
             url = "",
             sha256 = "",
+            path = name .. ".exe",
         }
     }
 }
