@@ -17,7 +17,7 @@ import (
 const createTpl = `local name = "{{ .Name }}"
 local version = "0.1.0"
 
-food = {
+plugin = {
     name = name,
     description = "enter description here",
     homepage = "https://github.com/Azure/draft",
