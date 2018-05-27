@@ -23,9 +23,6 @@ func TestFromDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not load python pack: %v", err)
 	}
-	if pack.Chart == nil {
-		t.Errorf("expected chart to be non-nil")
-	}
 
 	defer func() {
 		for _, f := range pack.Files {

@@ -4,18 +4,18 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"go/build"
+	"github.com/Azure/draft/pkg/drake/dk"
 )
 
 func TestMain(m *testing.M) {
@@ -30,7 +30,7 @@ func testmain(m *testing.M) int {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := os.Setenv(mg.CacheEnv, abs); err != nil {
+	if err := os.Setenv(dk.CacheEnv, abs); err != nil {
 		log.Fatal(err)
 	}
 	if err := os.Mkdir(dir, 0700); err != nil {
@@ -44,21 +44,6 @@ func testmain(m *testing.M) int {
 	return m.Run()
 }
 
-func TestGoRun(t *testing.T) {
-	c := exec.Command("go", "run", "main.go")
-	c.Dir = "./testdata"
-	c.Env = os.Environ()
-	b, err := c.CombinedOutput()
-	if err != nil {
-		t.Error("error:", err)
-	}
-	actual := string(b)
-	expected := "stuff\n"
-	if actual != expected {
-		t.Fatalf("expected %q, but got %q", expected, actual)
-	}
-}
-
 func TestVerbose(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -69,9 +54,8 @@ func TestVerbose(t *testing.T) {
 		Args:   []string{"testverbose"},
 	}
 
-	code := Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	actual := stdout.String()
 	expected := ""
@@ -81,9 +65,8 @@ func TestVerbose(t *testing.T) {
 	stderr.Reset()
 	stdout.Reset()
 	inv.Verbose = true
-	code = Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 
 	actual = stderr.String()
@@ -94,7 +77,7 @@ func TestVerbose(t *testing.T) {
 }
 
 func TestVerboseEnv(t *testing.T) {
-	os.Setenv("MAGE_VERBOSE", "true")
+	os.Setenv("DRAKE_VERBOSE", "true")
 
 	stdout := &bytes.Buffer{}
 	inv, _, err := Parse(stdout, []string{})
@@ -108,7 +91,7 @@ func TestVerboseEnv(t *testing.T) {
 		t.Fatalf("expected %t, but got %t ", expected, inv.Verbose)
 	}
 
-	os.Unsetenv("MAGE_VERBOSE")
+	os.Unsetenv("DRAKE_VERBOSE")
 }
 
 func TestList(t *testing.T) {
@@ -120,9 +103,8 @@ func TestList(t *testing.T) {
 		List:   true,
 	}
 
-	code := Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	actual := stdout.String()
 	expected := `
@@ -148,9 +130,8 @@ func TestNoArgNoDefaultList(t *testing.T) {
 		Stdout: stdout,
 		Stderr: stderr,
 	}
-	code := Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	if err := stderr.String(); err != "" {
 		t.Errorf("unexpected stderr output:\n%s", err)
@@ -174,9 +155,8 @@ func TestTargetError(t *testing.T) {
 		Stderr: stderr,
 		Args:   []string{"returnsnonnilerror"},
 	}
-	code := Invoke(inv)
-	if code != 1 {
-		t.Fatalf("expected 1, but got %v", code)
+	if err := Invoke(inv); err == nil {
+		t.Error("expected error != nil")
 	}
 	actual := stderr.String()
 	expected := "Error: bang!\n"
@@ -195,9 +175,8 @@ func TestStdinCopy(t *testing.T) {
 		Stdin:  stdin,
 		Args:   []string{"CopyStdin"},
 	}
-	code := Invoke(inv)
-	if code != 0 {
-		t.Fatalf("expected 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	actual := stdout.String()
 	expected := "hi!"
@@ -214,9 +193,8 @@ func TestTargetPanics(t *testing.T) {
 		Stderr: stderr,
 		Args:   []string{"panics"},
 	}
-	code := Invoke(inv)
-	if code != 1 {
-		t.Fatalf("expected 1, but got %v", code)
+	if err := Invoke(inv); err == nil {
+		t.Error("expected error != nil")
 	}
 	actual := stderr.String()
 	expected := "Error: boom!\n"
@@ -233,9 +211,8 @@ func TestPanicsErr(t *testing.T) {
 		Stderr: stderr,
 		Args:   []string{"panicserr"},
 	}
-	code := Invoke(inv)
-	if code != 1 {
-		t.Fatalf("expected 1, but got %v", code)
+	if err := Invoke(inv); err == nil {
+		t.Error("expected error != nil")
 	}
 	actual := stderr.String()
 	expected := "Error: kaboom!\n"
@@ -276,9 +253,8 @@ func TestKeepFlag(t *testing.T) {
 		Keep:   true,
 		Force:  true, // need force so we always regenerate
 	}
-	code := Invoke(inv)
-	if code != 0 {
-		t.Fatalf("expected code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 
 	if _, err := os.Stat(buildFile); err != nil {
@@ -312,9 +288,8 @@ func TestOnlyStdLib(t *testing.T) {
 		Force:   true, // need force so we always regenerate
 		Verbose: true,
 	}
-	code := Invoke(inv)
-	if code != 0 {
-		t.Fatalf("expected code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 
 	if _, err := os.Stat(buildFile); err != nil {
@@ -352,9 +327,8 @@ func TestMultipleTargets(t *testing.T) {
 		Args:    []string{"TestVerbose", "ReturnsNilError"},
 		Verbose: true,
 	}
-	code := Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	actual := stderr.String()
 	expected := "Running target: TestVerbose\nhi!\nRunning target: ReturnsNilError\n"
@@ -377,9 +351,8 @@ func TestFirstTargetFails(t *testing.T) {
 		Args:    []string{"ReturnsNonNilError", "ReturnsNilError"},
 		Verbose: true,
 	}
-	code := Invoke(inv)
-	if code != 1 {
-		t.Errorf("expected 1, but got %v", code)
+	if err := Invoke(inv); err == nil {
+		t.Error("expected error != nil")
 	}
 	actual := stderr.String()
 	expected := "Running target: ReturnsNonNilError\nError: bang!\n"
@@ -401,9 +374,8 @@ func TestBadSecondTargets(t *testing.T) {
 		Stderr: &stderr,
 		Args:   []string{"TestVerbose", "NotGonnaWork"},
 	}
-	code := Invoke(inv)
-	if code != 2 {
-		t.Errorf("expected 0, but got %v", code)
+	if err := Invoke(inv); err == nil {
+		t.Error("expected error != nil")
 	}
 	actual := stderr.String()
 	expected := "Unknown target specified: NotGonnaWork\n"
@@ -448,9 +420,8 @@ func TestTimeout(t *testing.T) {
 		Args:    []string{"timeout"},
 		Timeout: time.Duration(100 * time.Millisecond),
 	}
-	code := Invoke(inv)
-	if code != 1 {
-		t.Fatalf("expected 1, but got %v", code)
+	if err := Invoke(inv); err == nil {
+		t.Error("expected error != nil")
 	}
 	actual := stderr.String()
 	expected := "Error: context deadline exceeded\n"
@@ -486,12 +457,11 @@ func TestHelpTarget(t *testing.T) {
 		Args:   []string{"panics"},
 		Help:   true,
 	}
-	code := Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	actual := stdout.String()
-	expected := "mage panics:\n\nFunction that panics.\n\n"
+	expected := "drake panics:\n\nFunction that panics.\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -506,12 +476,11 @@ func TestHelpAlias(t *testing.T) {
 		Args:   []string{"status"},
 		Help:   true,
 	}
-	code := Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	actual := stdout.String()
-	expected := "mage status:\n\nPrints status.\n\nAliases: st, stat\n\n"
+	expected := "drake status:\n\nPrints status.\n\nAliases: st, stat\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -523,12 +492,11 @@ func TestHelpAlias(t *testing.T) {
 		Help:   true,
 	}
 	stdout.Reset()
-	code = Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	actual = stdout.String()
-	expected = "mage checkout:\n\nAliases: co\n\n"
+	expected = "drake checkout:\n\nAliases: co\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -542,9 +510,8 @@ func TestAlias(t *testing.T) {
 		Stderr: ioutil.Discard,
 		Args:   []string{"status"},
 	}
-	code := Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	actual := stdout.String()
 	expected := "alias!\n"
@@ -553,9 +520,8 @@ func TestAlias(t *testing.T) {
 	}
 	stdout.Reset()
 	inv.Args = []string{"st"}
-	code = Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+	if err := Invoke(inv); err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 	actual = stdout.String()
 	if actual != expected {
@@ -571,50 +537,12 @@ func TestInvalidAlias(t *testing.T) {
 		Stderr: stderr,
 		Args:   []string{"co"},
 	}
-	code := Invoke(inv)
-	if code != 1 {
-		t.Errorf("expected to exit with code 1, but got %v", code)
+	if err := Invoke(inv); err == nil {
+		t.Error("expected error != nil")
 	}
 	actual := stderr.String()
 	expected := "Unknown target: \"co\"\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
-	}
-}
-
-func TestClean(t *testing.T) {
-	TestGoRun(t) // make sure we've got something in the CACHE_DIR
-	dir := "./testing"
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	files, err := ioutil.ReadDir(abs)
-	if err != nil {
-		t.Error("issue reading file:", err)
-	}
-
-	if len(files) < 1 {
-		t.Error("Need at least 1 cached binaries to test --clean")
-	}
-
-	buf := &bytes.Buffer{}
-	_, cmd, err := Parse(buf, []string{"-clean"})
-	if cmd != Clean {
-		t.Errorf("Expected 'clean' command but got %v", cmd)
-	}
-	code := ParseAndRun(dir, os.Stdin, os.Stderr, buf, []string{"-clean"})
-	if code != 0 {
-		t.Errorf("expected 0, but got %v", code)
-	}
-
-	files, err = ioutil.ReadDir(abs)
-	if err != nil {
-		t.Error("issue reading file:", err)
-	}
-
-	if len(files) != 0 {
-		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", files)
 	}
 }

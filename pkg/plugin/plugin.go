@@ -21,6 +21,8 @@ type Plugin struct {
 	// The canonical name of the software.
 	Name string
 	// A (short) description of the software.
+	Short string
+	// A (long) description of the software.
 	Description string
 	// The license identifier for the software.
 	License string
@@ -99,7 +101,7 @@ func (p *Plugin) Uninstall(home Home) error {
 	if pkg == nil {
 		return nil
 	}
-	plugDir := filepath.Join(home.Installed(), p.Name, p.Version)
+	plugDir := filepath.Join(home.Installed(), p.Name)
 	return os.RemoveAll(plugDir)
 }
 

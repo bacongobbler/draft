@@ -63,8 +63,8 @@ func TestDepError(t *testing.T) {
 			t.Fatal("expected panic, but didn't get one")
 		}
 		actual := fmt.Sprint(err)
-		if "ouch!" != actual {
-			t.Fatalf(`expected to get "ouch!" but got "%s"`, actual)
+		if "ouch" != actual {
+			t.Fatalf(`expected to get "ouch" but got "%s"`, actual)
 		}
 	}()
 	Deps(f)

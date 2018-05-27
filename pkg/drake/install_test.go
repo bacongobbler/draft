@@ -21,7 +21,7 @@ func TestBootstrap(t *testing.T) {
 	if err != nil {
 		t.Fatal(s)
 	}
-	name := "mage"
+	name := "drake"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}

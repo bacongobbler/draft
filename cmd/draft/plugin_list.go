@@ -36,12 +36,22 @@ func (pcmd *pluginListCmd) run(args []string) error {
 	pHome := plugin.Home(pcmd.home.Plugins())
 	if len(args) == 0 {
 		table.AddRow("NAME")
-		for _, plugin := range findInstalledPlugins(pHome) {
+		installedPlugins := findInstalledPlugins(pHome)
+		if len(installedPlugins) == 0 {
+			fmt.Fprintln(pcmd.out, "No plugins found")
+			return nil
+		}
+		for _, plugin := range installedPlugins {
 			table.AddRow(path.Base(plugin))
 		}
 	} else {
 		table.AddRow("NAME", "VERSION")
-		for _, ver := range findPluginVersions(args[0], pHome) {
+		pluginVersions := findPluginVersions(args[0], pHome)
+		if len(pluginVersions) == 0 {
+			fmt.Fprintln(pcmd.out, "No versions found")
+			return nil
+		}
+		for _, ver := range pluginVersions {
 			p := plugin.Plugin{
 				Name:    args[0],
 				Version: ver,
@@ -49,6 +59,6 @@ func (pcmd *pluginListCmd) run(args []string) error {
 			table.AddRow(p.Name, p.Version)
 		}
 	}
-	fmt.Println(table)
+	fmt.Fprintln(pcmd.out, table)
 	return nil
 }

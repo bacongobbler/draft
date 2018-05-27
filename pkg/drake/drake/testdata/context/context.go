@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/Azure/draft/pkg/drake/dk"
 )
 
 // Returns a non-nil error.
@@ -24,5 +26,5 @@ func TakesContextWithError(ctx context.Context) error {
 }
 
 func CtxDeps(ctx context.Context) {
-	mg.CtxDeps(ctx, TakesContextNoError)
+	dk.CtxDeps(ctx, TakesContextNoError)
 }

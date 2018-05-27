@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Azure/draft/pkg/draft/draftpath"
+	"github.com/Azure/draft/pkg/plugin"
 	"github.com/Azure/draft/pkg/testing/helpers"
 )
 
@@ -22,22 +23,22 @@ func TestPluginRemoveCmd(t *testing.T) {
 	}
 	defer teardownTestPluginEnv(target, old)
 
-	remove := &pluginRemoveCmd{
+	remove := &pluginUninstallCmd{
 		home:  draftpath.Home(homePath()),
 		out:   buf,
 		names: []string{"echo"},
 	}
 
-	helpers.CopyTree(t, filepath.Join("testdata", "plugins"), pluginDirPath(remove.home))
+	helpers.CopyTree(t, filepath.Join("testdata", "plugins"), plugin.Home(remove.home.Plugins()).Installed())
 
 	if err := remove.run(); err != nil {
 		t.Errorf("Error removing plugin: %v", err)
 	}
 
-	expectedOutput := "Removed plugin: echo\n"
+	expectedOutput := "echo: uninstalled in"
 	actual := buf.String()
 
-	if strings.Compare(expectedOutput, actual) != 0 {
-		t.Errorf("Expected %v, got %v", expectedOutput, actual)
+	if !strings.Contains(actual, expectedOutput) {
+		t.Errorf("Expected '%v', got '%v'", expectedOutput, actual)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Azure/draft/pkg/draft/draftpath"
+	"github.com/Azure/draft/pkg/plugin"
 )
 
 func TestManuallyProcessArgs(t *testing.T) {
@@ -69,7 +70,7 @@ func TestLoadPlugins(t *testing.T) {
 
 	envs := strings.Join([]string{
 		"fullenv",
-		ph.Plugins() + "/fullenv",
+		plugin.Home(ph.Plugins()).Path("installed", "fullenv", "0.1.0"),
 		ph.Plugins(),
 		ph.String(),
 		os.Args[0],
@@ -116,10 +117,10 @@ func TestLoadPlugins(t *testing.T) {
 			t.Errorf("%d: Expected Use=%q, got %q", i, tt.use, pp.Use)
 		}
 		if pp.Short != tt.short {
-			t.Errorf("%d: Expected Use=%q, got %q", i, tt.short, pp.Short)
+			t.Errorf("%d: Expected Short=%q, got %q", i, tt.short, pp.Short)
 		}
 		if pp.Long != tt.long {
-			t.Errorf("%d: Expected Use=%q, got %q", i, tt.long, pp.Long)
+			t.Errorf("%d: Expected Long=%q, got %q", i, tt.long, pp.Long)
 		}
 
 		for _, variant := range tt.variants {
@@ -140,10 +141,8 @@ func TestLoadPlugins(t *testing.T) {
 
 func TestSetupEnv(t *testing.T) {
 	name := "pequod"
-	ver := "0.1.0"
 	ph := draftpath.Home(filepath.Join("testdata", "drafthome"))
 	base := filepath.Join(ph.Plugins(), name)
-	plugdirs := ph.Plugins()
 	flagDebug = true
 	defer func() {
 		flagDebug = false
@@ -151,13 +150,12 @@ func TestSetupEnv(t *testing.T) {
 
 	resetEnvVars := unsetEnvVars()
 	defer resetEnvVars()
-	setupPluginEnv(name, ver, base, plugdirs, ph)
+	setupPluginEnv(name, base, ph)
 	for _, tt := range []struct {
 		name   string
 		expect string
 	}{
 		{"DRAFT_PLUGIN_NAME", name},
-		{"DRAFT_PLUGIN_VERSION", ver},
 		{"DRAFT_PLUGIN_DIR", base},
 		{"DRAFT_PLUGIN", ph.Plugins()},
 		{"DRAFT_DEBUG", "1"},

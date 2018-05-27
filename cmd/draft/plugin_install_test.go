@@ -9,12 +9,13 @@ import (
 	"testing"
 
 	"github.com/Azure/draft/pkg/draft/draftpath"
+	"github.com/Azure/draft/pkg/plugin"
+	"github.com/Azure/draft/pkg/plugin/repository"
 )
 
 type pluginTest struct {
 	name   string
 	plugin string
-	path   string
 	output string
 	fail   bool
 	flags  []string
@@ -28,11 +29,11 @@ type testPluginEnv struct {
 func setupTestPluginEnv(target *testPluginEnv) (*testPluginEnv, error) {
 	// save old
 	old := draftHome
-	oldenv := os.Getenv(pluginEnvVar)
+	oldenv := os.Getenv(draftpath.PluginEnvVar)
 
 	// set new
 	draftHome = target.draftHome
-	err := os.Setenv(pluginEnvVar, target.pluginEnvVar)
+	err := os.Setenv(draftpath.PluginEnvVar, target.pluginEnvVar)
 
 	return &testPluginEnv{
 		draftHome:    old,
@@ -42,7 +43,7 @@ func setupTestPluginEnv(target *testPluginEnv) (*testPluginEnv, error) {
 
 func teardownTestPluginEnv(current, original *testPluginEnv) {
 	draftHome = original.draftHome
-	os.Setenv(pluginEnvVar, original.pluginEnvVar)
+	os.Setenv(draftpath.PluginEnvVar, original.pluginEnvVar)
 	os.RemoveAll(current.draftHome)
 }
 
@@ -55,7 +56,16 @@ func newTestPluginEnv(home, pluginEnvVarValue string) (*testPluginEnv, error) {
 			return target, err
 		}
 
-		if err := os.Mkdir(filepath.Join(tempHome, "plugins"), 0755); err != nil {
+		i := initCmd{
+			home: draftpath.Home(tempHome),
+			out:  ioutil.Discard,
+		}
+
+		if err := i.ensureDirectories(); err != nil {
+			return target, err
+		}
+
+		if err := i.ensurePluginRepositories([]repository.Builtin{}); err != nil {
 			return target, err
 		}
 
@@ -84,15 +94,13 @@ func TestPluginInstallCmd(t *testing.T) {
 	tests := []pluginTest{
 		{
 			name:   "install plugin",
-			plugin: "echo",
-			path:   filepath.Join("testdata", "plugins", "echo"),
-			output: "Installed plugin: echo\n",
+			plugin: "env",
+			output: "Installing env...\nenv 2.0.0: installed in",
 			fail:   false,
 		},
 		{
 			name:   "error installing nonexistent plugin",
 			plugin: "dummy",
-			path:   filepath.Join("testdata", "plugins", "dummy"),
 			output: "",
 			fail:   true,
 		},
@@ -103,21 +111,21 @@ func TestPluginInstallCmd(t *testing.T) {
 	for _, tt := range tests {
 		cmd := newPluginInstallCmd(buf)
 
-		if err := cmd.PreRunE(cmd, []string{tt.path}); err != nil {
+		if err := cmd.PreRunE(cmd, []string{tt.plugin}); err != nil {
 			t.Errorf("%q reported error: %s", tt.name, err)
 		}
 
-		if err := cmd.RunE(cmd, []string{tt.path}); err != nil && !tt.fail {
+		if err := cmd.RunE(cmd, []string{tt.plugin}); err != nil && !tt.fail {
 			t.Errorf("%q reported error: %s", tt.name, err)
 		}
 
 		if !tt.fail {
 			result := buf.String()
-			if strings.Compare(result, tt.output) != 0 {
+			if !strings.Contains(result, tt.output) {
 				t.Errorf("Expected %v, got %v", tt.output, result)
 			}
 
-			if _, err = os.Stat(filepath.Join(home.Plugins(), tt.plugin)); err != nil && os.IsNotExist(err) {
+			if _, err = os.Stat(filepath.Join(plugin.Home(home.Plugins()).Installed(), tt.plugin)); err != nil && os.IsNotExist(err) {
 				t.Errorf("Installed plugin not found: %v", err)
 			}
 

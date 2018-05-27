@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"k8s.io/helm/pkg/proto/hapi/chart"
 )
 
 const testDockerfile = `FROM nginx:latest
@@ -25,14 +23,8 @@ cleanup-task = "echo cleanup"
 
 func TestSaveDir(t *testing.T) {
 	p := &Pack{
-		Chart: &chart.Chart{
-			Metadata: &chart.Metadata{
-				Name: "chart-for-nigel-thornberry",
-			},
-		},
 		Files: map[string]io.ReadCloser{
 			dockerfileName: ioutil.NopCloser(bytes.NewBufferString(testDockerfile)),
-			TasksFileName:  ioutil.NopCloser(bytes.NewBufferString(testTasksFile)),
 		},
 	}
 	dir, err := ioutil.TempDir("", "draft-pack-test")
@@ -53,33 +45,10 @@ func TestSaveDir(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	tasksPath := filepath.Join(dir, TargetTasksFileName)
-	_, err = os.Stat(tasksPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("Expected %s to have been created but wasnt", TargetTasksFileName)
-		} else {
-			t.Fatal(err)
-		}
-	}
-
-	data, err := ioutil.ReadFile(tasksPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(data) == "" {
-		t.Error("Expected content in .draft-tasks.toml, got empty string")
-	}
 }
 
 func TestSaveDirDockerfileExistsInAppDir(t *testing.T) {
 	p := &Pack{
-		Chart: &chart.Chart{
-			Metadata: &chart.Metadata{
-				Name: "chart-for-nigel-thornberry",
-			},
-		},
 		Files: map[string]io.ReadCloser{
 			dockerfileName: ioutil.NopCloser(bytes.NewBufferString(testDockerfile)),
 		},

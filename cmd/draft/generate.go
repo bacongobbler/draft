@@ -42,8 +42,7 @@ func loadGenerators(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, 
 	if err != nil {
 		panic(err)
 	}
-	plugdir := pluginDirPath(home)
-	pHome := plugin.Home(plugdir)
+	pHome := plugin.Home(home.Plugins())
 	// Now we create commands for all of these.
 	for _, plug := range findInstalledPlugins(pHome) {
 		p, _, err := getPlugin(plug, pHome)

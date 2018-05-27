@@ -7,6 +7,7 @@ import (
 )
 
 const HomeEnvVar = "DRAFT_HOME"
+const PluginEnvVar = `DRAFT_PLUGIN`
 
 // Home describes the location of a CLI configuration.
 //
@@ -37,7 +38,13 @@ func (h Home) Logs() string {
 
 // Plugins returns the path to the Draft plugins.
 func (h Home) Plugins() string {
-	return h.Path("plugins")
+	plugdirs := os.Getenv(PluginEnvVar)
+
+	if plugdirs == "" {
+		plugdirs = h.Path("plugins")
+	}
+
+	return plugdirs
 }
 
 // String returns Home as a string.

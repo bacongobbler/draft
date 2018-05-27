@@ -10,7 +10,7 @@ import (
 
 	"github.com/Azure/draft/pkg/draft/draftpath"
 	packrepo "github.com/Azure/draft/pkg/draft/pack/repo"
-	"github.com/Azure/draft/pkg/plugin/installer"
+	"github.com/Azure/draft/pkg/plugin/repository/installer"
 )
 
 var _ installer.Installer = new(VCSInstaller)

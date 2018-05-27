@@ -13,7 +13,7 @@ import (
 	"github.com/Azure/draft/pkg/draft/draftpath"
 	"github.com/Azure/draft/pkg/draft/pack/repo"
 	"github.com/Azure/draft/pkg/osutil"
-	"github.com/Azure/draft/pkg/plugin/installer"
+	"github.com/Azure/draft/pkg/plugin/repository/installer"
 )
 
 //VCSInstaller installs packs from a remote repository

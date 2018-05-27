@@ -5,6 +5,8 @@ package main
 import (
 	"fmt"
 	"log"
+
+	"github.com/Azure/draft/pkg/drake/dk"
 )
 
 // This should work as a default - even if it's in a different file
@@ -21,7 +23,7 @@ func TestVerbose() {
 }
 
 func ReturnsVoid() {
-	mg.Deps(f)
+	dk.Deps(f)
 }
 
 func f() {}

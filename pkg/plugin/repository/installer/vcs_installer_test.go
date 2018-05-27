@@ -40,8 +40,8 @@ func TestVCSInstallerSuccess(t *testing.T) {
 	defer os.RemoveAll(dh)
 
 	home := plugin.Home(dh)
-	if err := os.MkdirAll(home.Rigs(), 0755); err != nil {
-		t.Fatalf("Could not create %s: %s", home.Rigs(), err)
+	if err := os.MkdirAll(home.Repositories(), 0755); err != nil {
+		t.Fatalf("Could not create %s: %s", home.Repositories(), err)
 	}
 
 	source := "https://github.com/org/plugins"
@@ -71,7 +71,7 @@ func TestVCSInstallerSuccess(t *testing.T) {
 	if repo.current != "0.1.1" {
 		t.Errorf("expected version '0.1.1', got %q", repo.current)
 	}
-	expectedPath := home.Path("Repositories", "github.com", "org", "plugins")
+	expectedPath := home.Path("repositories", "github.com", "org", "plugins")
 	if i.Path() != expectedPath {
 		t.Errorf("expected path '%s', got %q", expectedPath, i.Path())
 	}
@@ -90,11 +90,11 @@ func TestVCSInstallerUpdate(t *testing.T) {
 	defer os.RemoveAll(dh)
 
 	home := plugin.Home(dh)
-	if err := os.MkdirAll(home.Rigs(), 0755); err != nil {
-		t.Fatalf("Could not create %s: %s", home.Rigs(), err)
+	if err := os.MkdirAll(home.Repositories(), 0755); err != nil {
+		t.Fatalf("Could not create %s: %s", home.Repositories(), err)
 	}
 
-	source := "https://github.com/draftcreate/plugins"
+	source := "https://github.com/bacongobbler/draft-plugins"
 	i, err := New(source, "", home)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)

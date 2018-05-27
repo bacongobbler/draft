@@ -45,37 +45,35 @@ func (pcmd *pluginUninstallCmd) complete(args []string) error {
 
 func (pcmd *pluginUninstallCmd) run() error {
 	pHome := plugin.Home(pcmd.home.Plugins())
-	for _, plugin := range pcmd.names {
-		relevantPlugins := search([]string{plugin}, pHome)
-		switch len(relevantPlugins) {
+	for _, pluginName := range pcmd.names {
+		installedPlugins := findInstalledPlugins(pHome)
+		switch len(installedPlugins) {
 		case 0:
-			return fmt.Errorf("no plugin with the name '%s' was found", plugin)
+			return fmt.Errorf("no plugin with the name '%s' was found", pluginName)
 		case 1:
-			plugin = relevantPlugins[0]
+			pluginName = installedPlugins[0]
 		default:
 			var match bool
 			// check if we have an exact match
-			for _, f := range relevantPlugins {
-				if strings.Compare(f, plugin) == 0 {
-					plugin = f
+			for _, f := range installedPlugins {
+				if strings.Compare(f, pluginName) == 0 {
 					match = true
 				}
 			}
 			if !match {
-				return fmt.Errorf("%d plugins with the name '%s' was found: %v", len(relevantPlugins), plugin, relevantPlugins)
+				return fmt.Errorf("%d plugins with the name '%s' was found: %v", len(installedPlugins), pluginName, installedPlugins)
 			}
 		}
-		plugin, _, err := getPlugin(plugin, pHome)
-		if err != nil {
-			return err
+		p := plugin.Plugin{
+			Name: pluginName,
 		}
-		fmt.Fprintf(pcmd.out, "Uninstalling %s...\n", plugin.Name)
+		fmt.Fprintf(pcmd.out, "Uninstalling %s...\n", p.Name)
 		start := time.Now()
-		if err := plugin.Uninstall(pHome); err != nil {
+		if err := p.Uninstall(pHome); err != nil {
 			return err
 		}
 		t := time.Now()
-		fmt.Fprintf(pcmd.out, "%s %s: uninstalled in %s\n", plugin.Name, plugin.Version, t.Sub(start).String())
+		fmt.Fprintf(pcmd.out, "%s: uninstalled in %s\n", p.Name, t.Sub(start).String())
 		return nil
 	}
 	return nil

@@ -6,15 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s.io/helm/pkg/proto/hapi/chart"
-
 	"github.com/Azure/draft/pkg/osutil"
 )
 
 // Pack defines a Draft Starter Pack.
 type Pack struct {
-	// Chart is the Helm chart to be installed with the Pack.
-	Chart *chart.Chart
 	// Files are the files inside the Pack that will be installed.
 	Files map[string]io.ReadCloser
 }

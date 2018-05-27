@@ -83,7 +83,7 @@ func (i *initCmd) parseConfig() (*configFile, error) {
 	if i.configFile != "" {
 		conf, err := parseConfigFile(i.configFile)
 		if err != nil {
-			return nil, fmt.Errorf("Could not parse config file: %s", err)
+			return &configFile{}, fmt.Errorf("Could not parse config file: %s", err)
 		}
 		return conf, nil
 	}

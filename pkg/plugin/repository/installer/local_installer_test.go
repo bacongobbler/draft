@@ -11,18 +11,18 @@ import (
 var _ Installer = new(LocalInstaller)
 
 func TestLocalInstaller(t *testing.T) {
-	dh, err := ioutil.TempDir("", "fish-home-")
+	dh, err := ioutil.TempDir("", "plugrepo-home-")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dh)
 
 	home := plugin.Home(dh)
-	if err := os.MkdirAll(home.Plugins(), 0755); err != nil {
-		t.Fatalf("Could not create %s: %s", home.Rigs(), err)
+	if err := os.MkdirAll(home.String(), 0755); err != nil {
+		t.Fatalf("Could not create %s: %s", home.String(), err)
 	}
 
-	source := "testdata/fish-food"
+	source := "testdata/plugrepo"
 	i, err := New(source, "", home)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
@@ -32,7 +32,7 @@ func TestLocalInstaller(t *testing.T) {
 		t.Error(err)
 	}
 
-	expectedPath := home.Path("Rigs", "fish-food")
+	expectedPath := home.Path("repositories", "plugrepo")
 	if i.Path() != expectedPath {
 		t.Errorf("expected path '%s', got %q", expectedPath, i.Path())
 	}

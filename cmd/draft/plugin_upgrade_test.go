@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/draft/pkg/draft/draftpath"
 )
 
-func TestPluginUpdateCmd(t *testing.T) {
+func TestPluginUpgradeCmd(t *testing.T) {
 	// move this to e2e test suite soon
 	target, err := newTestPluginEnv("", "")
 	if err != nil {
@@ -22,29 +22,27 @@ func TestPluginUpdateCmd(t *testing.T) {
 	home := draftpath.Home(draftHome)
 	buf := bytes.NewBuffer(nil)
 
-	update := &pluginUpdateCmd{
-		names: []string{"server"},
-		home:  home,
-		out:   buf,
+	upgrade := &pluginUpgradeCmd{
+		home: home,
+		out:  buf,
 	}
 
-	if err := update.run(); err == nil {
-		t.Errorf("expected plugin update to err but did not")
+	if err := upgrade.run([]string{"server"}); err == nil {
+		t.Errorf("expected plugin upgrade to err but did not")
 	}
 
 	install := &pluginInstallCmd{
-		source:  "https://github.com/michelleN/draft-server",
-		version: "0.1.0",
-		home:    home,
-		out:     buf,
+		name: "env",
+		home: home,
+		out:  buf,
 	}
 
 	if err := install.run(); err != nil {
 		t.Fatalf("Erroring installing plugin")
 	}
 
-	if err := update.run(); err != nil {
-		t.Errorf("Erroring updating plugin: %v", err)
+	if err := upgrade.run([]string{"env"}); err != nil {
+		t.Errorf("Erroring upgrading plugin: %v", err)
 	}
 
 }

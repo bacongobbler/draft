@@ -13,11 +13,10 @@ import (
 )
 
 type pluginInstallCmd struct {
-	name    string
-	version string
-	home    draftpath.Home
-	out     io.Writer
-	args    []string
+	name string
+	home draftpath.Home
+	out  io.Writer
+	args []string
 }
 
 func newPluginInstallCmd(out io.Writer) *cobra.Command {

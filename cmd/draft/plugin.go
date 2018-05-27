@@ -25,8 +25,7 @@ import (
 )
 
 const (
-	pluginHelp   = `Manage client-side Draft plugins.`
-	pluginEnvVar = `DRAFT_PLUGIN`
+	pluginHelp = `Manage client-side Draft plugins.`
 )
 
 func newPluginCmd(out io.Writer) *cobra.Command {
@@ -48,24 +47,13 @@ func newPluginCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func pluginDirPath(home draftpath.Home) string {
-	plugdirs := os.Getenv(pluginEnvVar)
-
-	if plugdirs == "" {
-		plugdirs = home.Plugins()
-	}
-
-	return plugdirs
-}
-
 // loadPlugins loads plugins into the command list.
 //
 // This follows a different pattern than the other commands because it has
 // to inspect its environment and then add commands to the base command
 // as it finds them.
 func loadPlugins(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, in io.Reader) {
-	plugdir := pluginDirPath(home)
-	pHome := plugin.Home(plugdir)
+	pHome := plugin.Home(home.Plugins())
 	// Now we create commands for all of these.
 	for _, plug := range findInstalledPlugins(pHome) {
 		p, _, err := getPlugin(plug, pHome)
@@ -91,7 +79,8 @@ func loadPlugins(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, in 
 
 		c := &cobra.Command{
 			Use:   p.Name,
-			Short: p.Description,
+			Short: p.Short,
+			Long:  p.Description,
 			RunE: func(cmd *cobra.Command, args []string) error {
 
 				k, u := manuallyProcessArgs(args)
@@ -186,9 +175,9 @@ func setupPluginEnv(shortname, base string, home draftpath.Home) {
 
 		// Set vars that may not have been set, and save client the
 		// trouble of re-parsing.
-		pluginEnvVar:         pluginDirPath(home),
-		draftpath.HomeEnvVar: home.String(),
-		hostEnvVar:           tillerHost,
+		draftpath.PluginEnvVar: home.Plugins(),
+		draftpath.HomeEnvVar:   home.String(),
+		hostEnvVar:             tillerHost,
 		// Set vars that convey common information.
 		"DRAFT_PACKS_HOME": home.Packs(),
 	} {

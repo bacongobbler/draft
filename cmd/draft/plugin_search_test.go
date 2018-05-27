@@ -7,24 +7,23 @@ import (
 	"testing"
 
 	"github.com/Azure/draft/pkg/draft/draftpath"
+	"github.com/Azure/draft/pkg/plugin"
 )
 
-func TestPluginListCmd(t *testing.T) {
+func TestPluginSearchCmd(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 
 	resetEnvVars := unsetEnvVars()
 	defer resetEnvVars()
 
-	list := &pluginListCmd{
-		home: draftpath.Home(filepath.Join("testdata", "drafthome")),
+	searchCmd := &pluginSearchCmd{
+		home: plugin.Home(filepath.Join("testdata", "drafthome", "plugins")),
 		out:  buf,
 	}
 
-	if err := list.run(); err != nil {
-		t.Errorf("draft plugin list error: %v", err)
-	}
+	searchCmd.run([]string{})
 
-	expectedOutput := "NAME   \tVERSION\tDESCRIPTION      \nargs   \t       \tThis echos args  \necho   \t       \tThis echos stuff \nfullenv\t       \tshow all env vars\nhome   \t       \tshow DRAFT_HOME  \n"
+	expectedOutput := "NAME   \tREPOSITORY\tVERSION\tDESCRIPTION      \nargs   \tfoo       \t0.1.0  \tThis echos args  \necho   \tfoo       \t0.1.0  \tThis echos stuff \nfullenv\tfoo       \t0.1.0  \tshow all env vars\nhome   \tfoo       \t0.1.0  \tshow DRAFT_HOME  \n"
 
 	actual := buf.String()
 	if strings.Compare(actual, expectedOutput) != 0 {
@@ -51,7 +50,7 @@ func TestEmptyResultsOnPluginListCmd(t *testing.T) {
 		out:  buf,
 	}
 
-	if err := list.run(); err != nil {
+	if err := list.run([]string{}); err != nil {
 		t.Errorf("draft plugin list error: %v", err)
 	}
 

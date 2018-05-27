@@ -1,8 +1,13 @@
-[[plugin]]
-name = "plugin1"
-url = "a url"
-version = "1.0.0"
+plugins = ["plugin1"]
 
-[[repo]]
+plugin-repositories = [
+    "plugin-repo",
+]
+
+[[pack-repositories]]
 name = "pack-repo"
-url = "some url"
+url = "someurl"
+
+[[pack-repositories]]
+name = "pack-repo2"
+url = "someurl"

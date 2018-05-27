@@ -134,6 +134,31 @@ func main() {
 		os.Exit(2)
 	}
 
+	if os.Getenv("DRAKEFILE_HELP") != "" {
+		if len(os.Args) < 2 {
+			logger.Println("no target specified")
+			os.Exit(1)
+		}
+		switch strings.ToLower(os.Args[1]) {
+			{{range .Funcs}}case "{{lower .Name}}":
+				fmt.Print("drake {{lower .Name}}:\n\n")
+				{{if ne .Comment ""}}fmt.Println({{printf "%q" .Comment}}){{end}}
+				var aliases []string
+				{{- $name := .Name -}}
+				{{range $alias, $func := $.Aliases}}
+				{{if eq $name $func}}aliases = append(aliases, "{{$alias}}"){{end -}}
+				{{- end}}
+				if len(aliases) > 0 {
+					fmt.Printf("Aliases: %s\n\n", strings.Join(aliases, ", "))
+				}
+				return
+			{{end}}
+			default:
+				logger.Printf("Unknown target: %q\n", os.Args[1])
+				os.Exit(1)
+		}	
+	}
+
 	if len(os.Args) < 2 {
 	{{- if .Default}}
 		{{.DefaultFunc.TemplateString}}
