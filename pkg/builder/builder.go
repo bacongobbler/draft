@@ -207,17 +207,17 @@ func loadArchive(ctx *Context) (err error) {
 			return err
 		}
 	} else {
-		// otherwise, find the first directory in chart/ and assume that is the chart we want to deploy.
-		chartDir := filepath.Join(ctx.AppDir, draft.ChartsDir)
-		files, err := ioutil.ReadDir(chartDir)
+		// otherwise, find the first directory in charts/ and assume that is the chart we want to deploy.
+		chartsDir := filepath.Join(ctx.AppDir, draft.ChartsDir)
+		files, err := ioutil.ReadDir(chartsDir)
 		if err != nil {
 			return err
 		}
 		var found bool
-		for _, file := range files {
-			if file.IsDir() {
+		for _, dir := range files {
+			if dir.IsDir() {
 				found = true
-				if ctx.Chart, err = chartutil.Load(filepath.Join(chartDir, file.Name())); err != nil {
+				if ctx.Chart, err = chartutil.Load(filepath.Join(chartsDir, dir.Name())); err != nil {
 					return err
 				}
 				break
@@ -227,7 +227,6 @@ func loadArchive(ctx *Context) (err error) {
 			return ErrChartNotExist
 		}
 	}
-
 	return nil
 }
 
