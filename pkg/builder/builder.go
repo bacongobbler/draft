@@ -167,7 +167,7 @@ func newAppContext(b *Builder, buildCtx *Context) (*AppContext, error) {
 func LoadWithEnv(appdir, whichenv string) (*Context, error) {
 	ctx := &Context{AppDir: appdir, EnvName: whichenv}
 	// read draft.toml from appdir.
-	mfst, err := manifest.Load(filepath.Join(appdir, "draft.toml"))
+	mfst, err := manifest.Load(filepath.Join(appdir, draft.DraftTomlFilename))
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal draft.toml from %q: %v", appdir, err)
 	}
@@ -276,10 +276,10 @@ func archiveSrc(ctx *Context) error {
 	// parses the Dockerfile. Ignore errors here, as they will have been
 	// caught by validateContextDirectory above.
 	var includes = []string{"."}
-	keepThem1, _ := fileutils.Matches(".dockerignore", excludes)
+	keepThem1, _ := fileutils.Matches(DockerignoreFilename, excludes)
 	keepThem2, _ := fileutils.Matches(relDockerfile, excludes)
 	if keepThem1 || keepThem2 {
-		includes = append(includes, ".dockerignore", relDockerfile)
+		includes = append(includes, DockerignoreFilename, relDockerfile)
 	}
 
 	logrus.Debugf("INCLUDES: %v", includes)
