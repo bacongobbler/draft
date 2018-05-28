@@ -40,6 +40,8 @@ const (
 	PullSecretName = "draft-pullsecret"
 	// DefaultServiceAccountName is the name of the default service account draft will modify with the imagepullsecret
 	DefaultServiceAccountName = "default"
+	// DockerignoreFilename is the filename for Docker's ignore file.
+	DockerignoreFilename = ".dockerignore"
 )
 
 // Builder contains information about the build environment
@@ -73,7 +75,6 @@ type Context struct {
 	AppDir  string
 	Chart   *chart.Chart
 	Values  *chart.Config
-	SrcName string
 	Archive []byte
 }
 
@@ -175,11 +176,7 @@ func LoadWithEnv(appdir, whichenv string) (*Context, error) {
 	if ctx.Env, ok = mfst.Environments[whichenv]; !ok {
 		return nil, fmt.Errorf("no environment named %q in draft.toml", whichenv)
 	}
-	// load the chart and the build archive; if a chart directory is present
-	// this will be given priority over the chart archive specified by the
-	// `chart-tar` field in the draft.toml. If this is the case, then build-tar
-	// is built from scratch. If no chart directory exists but a chart-tar and
-	// build-tar exist, then these will be used for values extraction.
+	// load the chart and the build archives
 	if err := loadArchive(ctx); err != nil {
 		return nil, fmt.Errorf("failed to load chart: %v", err)
 	}
@@ -190,11 +187,7 @@ func LoadWithEnv(appdir, whichenv string) (*Context, error) {
 	return ctx, nil
 }
 
-// loadArchive loads the chart package and build archive.
-// Precedence is given to the `build-tar` and `chart-tar`
-// indicated in the `draft.toml` if present. Otherwise,
-// loadArchive loads the chart directory and archives the
-// app directory to send to the draft server.
+// loadArchive loads the helm chart and build archive.
 func loadArchive(ctx *Context) (err error) {
 	if err = archiveSrc(ctx); err != nil {
 		return err
@@ -255,7 +248,7 @@ func archiveSrc(ctx *Context) error {
 	if err != nil {
 		return fmt.Errorf("cannot canonicalize dockerfile path %s: %v", relDockerfile, err)
 	}
-	f, err := os.Open(filepath.Join(contextDir, ".dockerignore"))
+	f, err := os.Open(filepath.Join(contextDir, DockerignoreFilename))
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -269,8 +262,8 @@ func archiveSrc(ctx *Context) error {
 		}
 	}
 
-	// do not include the chart directory. That will be packaged separately.
-	excludes = append(excludes, filepath.Join(contextDir, "chart"))
+	// do not include the charts directory. That will be packaged separately.
+	excludes = append(excludes, filepath.Join(contextDir, draft.ChartsDir))
 	if err := build.ValidateContextDirectory(contextDir, excludes); err != nil {
 		return fmt.Errorf("error checking docker context: '%s'", err)
 	}
@@ -305,7 +298,6 @@ func archiveSrc(ctx *Context) error {
 	if _, err := io.Copy(&b, rc); err != nil {
 		return err
 	}
-	ctx.SrcName = "build.tar.gz"
 	ctx.Archive = b.Bytes()
 	return nil
 }
