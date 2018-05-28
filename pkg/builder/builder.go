@@ -196,23 +196,6 @@ func LoadWithEnv(appdir, whichenv string) (*Context, error) {
 // loadArchive loads the chart directory and archives the
 // app directory to send to the draft server.
 func loadArchive(ctx *Context) (err error) {
-	if ctx.Env.BuildTarPath != "" && ctx.Env.ChartTarPath != "" {
-		b, err := ioutil.ReadFile(ctx.Env.BuildTarPath)
-		if err != nil {
-			return fmt.Errorf("failed to load build archive %q: %v", ctx.Env.BuildTarPath, err)
-		}
-		ctx.SrcName = filepath.Base(ctx.Env.BuildTarPath)
-		ctx.Archive = b
-
-		ar, err := os.Open(ctx.Env.ChartTarPath)
-		if err != nil {
-			return err
-		}
-		if ctx.Chart, err = chartutil.LoadArchive(ar); err != nil {
-			return fmt.Errorf("failed to load chart archive %q: %v", ctx.Env.ChartTarPath, err)
-		}
-		return nil
-	}
 	if err = archiveSrc(ctx); err != nil {
 		return err
 	}

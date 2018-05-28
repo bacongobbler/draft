@@ -29,8 +29,6 @@ type Environment struct {
 	ContainerBuilder  string   `toml:"container-builder,omitempty"`
 	Registry          string   `toml:"registry,omitempty"`
 	ResourceGroupName string   `toml:"resource-group-name,omitempty"`
-	BuildTarPath      string   `toml:"build-tar,omitempty"`
-	ChartTarPath      string   `toml:"chart-tar,omitempty"`
 	Namespace         string   `toml:"namespace,omitempty"`
 	Values            []string `toml:"set,omitempty"`
 	Wait              bool     `toml:"wait"`
