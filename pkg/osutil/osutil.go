@@ -37,7 +37,7 @@ func SymlinkWithFallback(oldname, newname string) (err error) {
 	return
 }
 
-// EnsureDirectory checks if a directory exists and creates it if it doesn't
+// EnsureDirectory checks if a directory exists and creates it if it doesn't exist
 func EnsureDirectory(dir string) error {
 	if fi, err := os.Stat(dir); err != nil {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -50,7 +50,7 @@ func EnsureDirectory(dir string) error {
 	return nil
 }
 
-// EnsureFile checks if a file exists and creates it if it doesn't
+// EnsureFile checks if a file exists and creates it if it doesn't exist
 func EnsureFile(file string) error {
 	fi, err := os.Stat(file)
 	if err != nil {
