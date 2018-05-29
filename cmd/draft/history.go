@@ -49,7 +49,7 @@ func newHistoryCmd(out io.Writer) *cobra.Command {
 }
 
 func (cmd *historyCmd) run() error {
-	app, err := local.DeployedApplication(draft.DraftTomlFilename, cmd.env)
+	app, err := local.DeployedApplication(draft.DraftTomlFilepath, cmd.env)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,6 @@ type buildHistory []buildInfo
 type buildInfo struct {
 	BuildID string `json:"buildID"`
 	Release string `json:"release"`
-	Context string `json:"context"`
 	Created string `json:"createdAt"`
 }
 
@@ -126,11 +125,9 @@ func toBuildHistory(ls []*storage.Object) (h buildHistory) {
 	}
 	for i := len(ls) - 1; i >= 0; i-- {
 		rls := orElse(ls[i].GetRelease(), "-")
-		ctx := ls[i].GetContextID()
 		h = append(h, buildInfo{
 			BuildID: ls[i].GetBuildID(),
 			Release: rls,
-			Context: fmt.Sprintf("%X", ctx[len(ctx)-5:]),
 			Created: timeconv.String(ls[i].GetCreatedAt()),
 		})
 	}
@@ -140,10 +137,10 @@ func toBuildHistory(ls []*storage.Object) (h buildHistory) {
 func formatTable(h buildHistory, w uint) []byte {
 	tbl := uitable.New()
 	tbl.MaxColWidth = w
-	tbl.AddRow("BUILD_ID", "CONTEXT_ID", "CREATED_AT", "RELEASE")
+	tbl.AddRow("BUILD_ID", "CREATED_AT", "RELEASE")
 	for i := 0; i < len(h); i++ {
 		b := h[i]
-		tbl.AddRow(b.BuildID, b.Context, b.Created, b.Release)
+		tbl.AddRow(b.BuildID, b.Created, b.Release)
 	}
 	return tbl.Bytes()
 }

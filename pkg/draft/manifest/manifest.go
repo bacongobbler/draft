@@ -37,7 +37,7 @@ type Environment struct {
 	OverridePorts     []string `toml:"override-ports,omitempty"`
 	AutoConnect       bool     `toml:"auto-connect"`
 	CustomTags        []string `toml:"custom-tags,omitempty"`
-	Dockerfile        string   `toml:"dockerfile"`
+	Controllers       []string `toml:"controllers"`
 	Chart             string   `toml:"chart"`
 }
 

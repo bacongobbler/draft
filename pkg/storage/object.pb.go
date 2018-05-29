@@ -32,7 +32,6 @@ const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 type Object struct {
 	BuildID     string                     `protobuf:"bytes,1,opt,name=buildID" json:"buildID,omitempty"`
 	Release     string                     `protobuf:"bytes,2,opt,name=release" json:"release,omitempty"`
-	ContextID   []byte                     `protobuf:"bytes,3,opt,name=contextID,proto3" json:"contextID,omitempty"`
 	LogsFileRef string                     `protobuf:"bytes,4,opt,name=logs_file_ref,json=logsFileRef" json:"logs_file_ref,omitempty"`
 	CreatedAt   *google_protobuf.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 }
@@ -54,13 +53,6 @@ func (m *Object) GetRelease() string {
 		return m.Release
 	}
 	return ""
-}
-
-func (m *Object) GetContextID() []byte {
-	if m != nil {
-		return m.ContextID
-	}
-	return nil
 }
 
 func (m *Object) GetLogsFileRef() string {

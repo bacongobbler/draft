@@ -70,7 +70,7 @@ func newConnectCmd(out io.Writer) *cobra.Command {
 }
 
 func (cn *connectCmd) run(runningEnvironment string) (err error) {
-	deployedApp, err := local.DeployedApplication(draft.DraftTomlFilename, runningEnvironment)
+	deployedApp, err := local.DeployedApplication(draft.DraftTomlFilepath, runningEnvironment)
 	if err != nil {
 		return err
 	}

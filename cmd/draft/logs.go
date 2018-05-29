@@ -41,7 +41,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 		Long:    logsDesc,
 		PreRunE: lc.complete,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			deployedApp, err := local.DeployedApplication(draft.DraftTomlFilename, runningEnvironment)
+			deployedApp, err := local.DeployedApplication(draft.DraftTomlFilepath, runningEnvironment)
 			if err != nil {
 				return err
 			}

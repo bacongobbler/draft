@@ -2,10 +2,11 @@ package inprocess
 
 import (
 	"context"
-	"github.com/Azure/draft/pkg/storage"
-	"github.com/golang/protobuf/ptypes"
 	"reflect"
 	"testing"
+
+	"github.com/Azure/draft/pkg/storage"
+	"github.com/golang/protobuf/ptypes"
 )
 
 func TestStoreDeleteBuilds(t *testing.T) {
@@ -133,11 +134,10 @@ func assertEqual(t *testing.T, label string, a, b interface{}) {
 	}
 }
 
-func objectStub(buildID, release string, contextID []byte) *storage.Object {
+func objectStub(buildID, release string) *storage.Object {
 	return &storage.Object{
 		BuildID:   buildID,
 		Release:   release,
-		ContextID: contextID,
 		CreatedAt: createdAt,
 	}
 }

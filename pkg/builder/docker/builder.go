@@ -19,56 +19,57 @@ type Builder struct {
 	DockerClient command.Cli
 }
 
-// Build builds the docker image.
+// Build builds the docker images.
 func (b *Builder) Build(ctx context.Context, app *builder.AppContext, out chan<- *builder.Summary) (err error) {
-	const stageDesc = "Building Docker Image"
+	const stageDesc = "Building Docker Images"
 
 	defer builder.Complete(app.ID, stageDesc, out, &err)
 	summary := builder.Summarize(app.ID, stageDesc, out)
 
 	// notify that particular stage has started.
-	summary("started", builder.SummaryStarted)
+	summary("started", builder.SummaryOngoing)
 
-	msgc := make(chan string)
 	errc := make(chan error)
 	go func() {
-		buildopts := types.ImageBuildOptions{
-			Tags:       app.Images,
-			Dockerfile: app.Ctx.Env.Dockerfile,
-		}
+		defer close(errc)
+		var wg sync.WaitGroup
+		wg.Add(len(app.DockerContexts))
+		for _, dockerContext := range app.DockerContexts {
+			go func(buildContext *builder.DockerContext) {
+				defer func() {
+					buildContext.BuildContext.Close()
+					wg.Done()
+				}()
+				buildopts := types.ImageBuildOptions{
+					Tags:       buildContext.Images,
+					Dockerfile: buildContext.Dockerfile,
+				}
 
-		resp, err := b.DockerClient.Client().ImageBuild(ctx, app.Buf, buildopts)
-		if err != nil {
-			errc <- err
-			return
+				resp, err := b.DockerClient.Client().ImageBuild(ctx, buildContext.BuildContext, buildopts)
+				if err != nil {
+					errc <- err
+					return
+				}
+				defer resp.Body.Close()
+				outFd, isTerm := term.GetFdInfo(buildContext.BuildContext)
+				if err := jsonmessage.DisplayJSONMessagesStream(resp.Body, app.Log, outFd, isTerm, nil); err != nil {
+					errc <- err
+					return
+				}
+				if _, _, err = b.DockerClient.Client().ImageInspectWithRaw(ctx, buildContext.Images[0]); err != nil {
+					if dockerclient.IsErrNotFound(err) {
+						errc <- fmt.Errorf("Could not locate image for %s: %v", app.Ctx.Env.Name, err)
+						return
+					}
+					errc <- fmt.Errorf("ImageInspectWithRaw error: %v", err)
+					return
+				}
+			}(dockerContext)
 		}
-		defer func() {
-			resp.Body.Close()
-			close(msgc)
-			close(errc)
-		}()
-		outFd, isTerm := term.GetFdInfo(app.Buf)
-		if err := jsonmessage.DisplayJSONMessagesStream(resp.Body, app.Log, outFd, isTerm, nil); err != nil {
-			errc <- err
-			return
-		}
-		if _, _, err = b.DockerClient.Client().ImageInspectWithRaw(ctx, app.MainImage); err != nil {
-			if dockerclient.IsErrNotFound(err) {
-				errc <- fmt.Errorf("Could not locate image for %s: %v", app.Ctx.Env.Name, err)
-				return
-			}
-			errc <- fmt.Errorf("ImageInspectWithRaw error: %v", err)
-			return
-		}
+		wg.Wait()
 	}()
-	for msgc != nil || errc != nil {
+	for errc != nil {
 		select {
-		case msg, ok := <-msgc:
-			if !ok {
-				msgc = nil
-				continue
-			}
-			summary(msg, builder.SummaryLogging)
 		case err, ok := <-errc:
 			if !ok {
 				errc = nil
@@ -85,65 +86,56 @@ func (b *Builder) Build(ctx context.Context, app *builder.AppContext, out chan<-
 
 // Push pushes the results of Build to the image repository.
 func (b *Builder) Push(ctx context.Context, app *builder.AppContext, out chan<- *builder.Summary) (err error) {
+	const stageDesc = "Pushing Docker Images"
 	if app.Ctx.Env.Registry == "" {
 		return
 	}
 
-	const stageDesc = "Pushing Docker Image"
-
-	defer builder.Complete(app.ID, stageDesc, out, &err)
 	summary := builder.Summarize(app.ID, stageDesc, out)
+	defer builder.Complete(app.ID, stageDesc, out, &err)
 
 	// notify that particular stage has started.
 	summary("started", builder.SummaryStarted)
 
-	msgc := make(chan string, 1)
 	errc := make(chan error, 1)
-
-	var wg sync.WaitGroup
-	wg.Add(len(app.Images))
-
 	go func() {
-		registryAuth, err := command.RetrieveAuthTokenFromImage(ctx, b.DockerClient, app.MainImage)
-		if err != nil {
-			errc <- err
-			return
-		}
-
-		for _, tag := range app.Images {
-
-			go func(tag string) {
+		defer close(errc)
+		var wg sync.WaitGroup
+		wg.Add(len(app.DockerContexts))
+		for _, dockerContext := range app.DockerContexts {
+			go func(buildContext *builder.DockerContext) {
 				defer wg.Done()
-
-				resp, err := b.DockerClient.Client().ImagePush(ctx, tag, types.ImagePushOptions{RegistryAuth: registryAuth})
+				registryAuth, err := command.RetrieveAuthTokenFromImage(ctx, b.DockerClient, buildContext.Images[0])
 				if err != nil {
 					errc <- err
 					return
 				}
 
-				defer resp.Close()
-				outFd, isTerm := term.GetFdInfo(app.Log)
-				if err := jsonmessage.DisplayJSONMessagesStream(resp, app.Log, outFd, isTerm, nil); err != nil {
-					errc <- err
-					return
+				for _, tag := range buildContext.Images {
+					wg.Add(1)
+					go func(tag string) {
+						defer wg.Done()
+						resp, err := b.DockerClient.Client().ImagePush(ctx, tag, types.ImagePushOptions{RegistryAuth: registryAuth})
+						if err != nil {
+							errc <- err
+							return
+						}
+
+						defer resp.Close()
+						outFd, isTerm := term.GetFdInfo(app.Log)
+						if err := jsonmessage.DisplayJSONMessagesStream(resp, app.Log, outFd, isTerm, nil); err != nil {
+							errc <- err
+							return
+						}
+					}(tag)
 				}
-			}(tag)
+			}(dockerContext)
 		}
-
-		defer func() {
-			close(errc)
-			close(msgc)
-		}()
-
+		wg.Wait()
 	}()
-	for msgc != nil || errc != nil {
+
+	for errc != nil {
 		select {
-		case msg, ok := <-msgc:
-			if !ok {
-				msgc = nil
-				continue
-			}
-			summary(msg, builder.SummaryLogging)
 		case err, ok := <-errc:
 			if !ok {
 				errc = nil
@@ -151,15 +143,14 @@ func (b *Builder) Push(ctx context.Context, app *builder.AppContext, out chan<- 
 			}
 			return err
 		default:
-			summary("ongoing", builder.SummaryOngoing)
+			summary("ongoing", builder.SummaryStarted)
 			time.Sleep(time.Second)
 		}
 	}
-	wg.Wait()
 	return nil
 }
 
 // AuthToken retrieves the auth token for the given image.
 func (b *Builder) AuthToken(ctx context.Context, app *builder.AppContext) (string, error) {
-	return command.RetrieveAuthTokenFromImage(ctx, b.DockerClient, app.MainImage)
+	return command.RetrieveAuthTokenFromImage(ctx, b.DockerClient, app.DockerContexts[0].Images[0])
 }

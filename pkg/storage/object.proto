@@ -8,7 +8,6 @@ import "google/protobuf/timestamp.proto";
 message Object {
 	string buildID = 1;  					// build uuid generated during draft up
 	string release = 2;  					// name of associated helm release
-	bytes contextID = 3; 				    // checksum of docker context
 	string logs_file_ref = 4; 				// reference to build logs file
 	google.protobuf.Timestamp created_at = 5; // time at which this object was created
 }

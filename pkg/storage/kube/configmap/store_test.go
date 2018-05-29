@@ -115,11 +115,10 @@ func newMockConfigMapsTestFixture(t *testing.T) *ConfigMaps {
 	return NewConfigMapsWithMocks(t, mocks...)
 }
 
-func objectStub(buildID, release string, contextID []byte) *storage.Object {
+func objectStub(buildID, release string) *storage.Object {
 	return &storage.Object{
-		BuildID:   buildID,
-		Release:   release,
-		ContextID: contextID,
+		BuildID: buildID,
+		Release: release,
 	}
 }
 

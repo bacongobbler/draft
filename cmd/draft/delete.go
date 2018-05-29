@@ -54,7 +54,7 @@ func (d *deleteCmd) run(runningEnvironment string) error {
 	if d.appName != "" {
 		name = d.appName
 	} else {
-		deployedApp, err := local.DeployedApplication(draft.DraftTomlFilename, runningEnvironment)
+		deployedApp, err := local.DeployedApplication(draft.DraftTomlFilepath, runningEnvironment)
 		if err != nil {
 			return errors.New("Unable to detect app name\nPlease pass in the name of the application")
 

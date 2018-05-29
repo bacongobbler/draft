@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -70,25 +71,30 @@ func (b *Builder) Logs(appName string) string {
 
 // Context contains information about the application
 type Context struct {
-	Env     *manifest.Environment
-	EnvName string
-	AppDir  string
-	Chart   *chart.Chart
-	Values  *chart.Config
-	Archive []byte
+	Env            *manifest.Environment
+	EnvName        string
+	AppDir         string
+	Chart          *chart.Chart
+	Values         *chart.Config
+	DockerContexts []*DockerContext
+}
+
+type DockerContext struct {
+	Name         string
+	Images       []string
+	Dockerfile   string
+	BuildContext io.ReadCloser
 }
 
 // AppContext contains state information carried across the various draft stage boundaries.
 type AppContext struct {
-	Obj       *storage.Object
-	Bldr      *Builder
-	Ctx       *Context
-	Buf       *bytes.Buffer
-	MainImage string
-	Images    []string
-	Log       io.WriteCloser
-	ID        string
-	Vals      chartutil.Values
+	Obj            *storage.Object
+	Bldr           *Builder
+	Ctx            *Context
+	DockerContexts []*DockerContext
+	Log            io.WriteCloser
+	ID             string
+	Vals           chartutil.Values
 }
 
 // New creates a new Builder.
@@ -100,42 +106,47 @@ func New() *Builder {
 
 // newAppContext prepares state carried across the various draft stage boundaries.
 func newAppContext(b *Builder, buildCtx *Context) (*AppContext, error) {
-	raw := bytes.NewBuffer(buildCtx.Archive)
-	// write build context to a buffer so we can also write to the sha256 hash.
-	buf := new(bytes.Buffer)
-	h := sha256.New()
-	w := io.MultiWriter(buf, h)
-	if _, err := io.Copy(w, raw); err != nil {
-		return nil, err
-	}
-	// truncate checksum to the first 40 characters (20 bytes) this is the
-	// equivalent of `shasum build.tar.gz | awk '{print $1}'`.
-	ctxtID := h.Sum(nil)
-	imgtag := fmt.Sprintf("%.20x", ctxtID)
-	// if registry == "", then we just assume the image name is the app name and strip out the leading /
-	imageRepository := strings.TrimLeft(fmt.Sprintf("%s/%s", buildCtx.Env.Registry, buildCtx.Env.Name), "/")
-	image := fmt.Sprintf("%s:%s", imageRepository, imgtag)
-
-	images := []string{image}
-	for _, tag := range buildCtx.Env.CustomTags {
-		images = append(images, fmt.Sprintf("%s:%s", imageRepository, tag))
-	}
-
-	// inject certain values into the chart such as the registry location,
-	// the application name, buildID and the application version.
-	tplstr := "image.repository=%s,image.tag=%s,%s=%s,%s=%s"
-	inject := fmt.Sprintf(tplstr, imageRepository, imgtag, local.DraftLabelKey, buildCtx.Env.Name, local.BuildIDKey, b.ID)
+	var buildContexts []*DockerContext
 
 	vals, err := chartutil.ReadValues([]byte(buildCtx.Values.Raw))
 	if err != nil {
 		return nil, err
 	}
-	if err := strvals.ParseInto(inject, vals); err != nil {
-		return nil, err
+
+	for _, dockerBuildContext := range buildCtx.DockerContexts {
+		defer dockerBuildContext.BuildContext.Close()
+		// write each build context to a buffer so we can also write to the sha256 hash.
+		buf := new(bytes.Buffer)
+		h := sha256.New()
+		w := io.MultiWriter(buf, h)
+		if _, err := io.Copy(w, dockerBuildContext.BuildContext); err != nil {
+			return nil, err
+		}
+		// truncate checksum to the first 40 characters (20 bytes) this is the
+		// equivalent of `shasum build.tar.gz | awk '{print $1}'`.
+		ctxtID := h.Sum(nil)
+		imgtag := fmt.Sprintf("%.20x", ctxtID)
+		imageRepository := path.Join(buildCtx.Env.Registry, fmt.Sprintf("%s-%s", buildCtx.Env.Name, dockerBuildContext.Name))
+		image := fmt.Sprintf("%s:%s", imageRepository, imgtag)
+
+		dockerBuildContext.Images = []string{image}
+		for _, tag := range buildCtx.Env.CustomTags {
+			dockerBuildContext.Images = append(dockerBuildContext.Images, fmt.Sprintf("%s:%s", imageRepository, tag))
+		}
+		dockerBuildContext.BuildContext = ioutil.NopCloser(buf)
+		buildContexts = append(buildContexts, dockerBuildContext)
+
+		// inject certain values into the chart such as the registry location,
+		// the application name, buildID and the application version.
+		tplstr := "%s.image.repository=%s,%s.image.tag=%s,%s=%s,%s=%s"
+		inject := fmt.Sprintf(tplstr, dockerBuildContext.Name, imageRepository, dockerBuildContext.Name, imgtag, local.DraftLabelKey, buildCtx.Env.Name, local.BuildIDKey, b.ID)
+
+		if err := strvals.ParseInto(inject, vals); err != nil {
+			return nil, err
+		}
 	}
 
-	err = osutil.EnsureDirectory(filepath.Dir(b.Logs(buildCtx.Env.Name)))
-	if err != nil {
+	if err := osutil.EnsureDirectory(filepath.Dir(b.Logs(buildCtx.Env.Name))); err != nil {
 		return nil, err
 	}
 
@@ -145,19 +156,17 @@ func newAppContext(b *Builder, buildCtx *Context) (*AppContext, error) {
 	}
 	state := &storage.Object{
 		BuildID:     b.ID,
-		ContextID:   ctxtID,
 		LogsFileRef: b.Logs(buildCtx.Env.Name),
 	}
+
 	return &AppContext{
-		Obj:       state,
-		ID:        b.ID,
-		Bldr:      b,
-		Ctx:       buildCtx,
-		Buf:       buf,
-		Images:    images,
-		MainImage: image,
-		Log:       logf,
-		Vals:      vals,
+		Obj:            state,
+		ID:             b.ID,
+		Bldr:           b,
+		Ctx:            buildCtx,
+		DockerContexts: buildContexts,
+		Log:            logf,
+		Vals:           vals,
 	}, nil
 }
 
@@ -167,14 +176,15 @@ func newAppContext(b *Builder, buildCtx *Context) (*AppContext, error) {
 func LoadWithEnv(appdir, whichenv string) (*Context, error) {
 	ctx := &Context{AppDir: appdir, EnvName: whichenv}
 	// read draft.toml from appdir.
-	mfst, err := manifest.Load(filepath.Join(appdir, draft.DraftTomlFilename))
+	draftTomlFilepath := filepath.Join(appdir, draft.DraftTomlFilepath)
+	mfst, err := manifest.Load(draftTomlFilepath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal draft.toml from %q: %v", appdir, err)
+		return nil, fmt.Errorf("failed to unmarshal %s: %v", draftTomlFilepath, err)
 	}
 	// if environment does not exist return error.
 	var ok bool
 	if ctx.Env, ok = mfst.Environments[whichenv]; !ok {
-		return nil, fmt.Errorf("no environment named %q in draft.toml", whichenv)
+		return nil, fmt.Errorf("no environment named %q in %s", whichenv, draftTomlFilepath)
 	}
 	// load the chart and the build archives
 	if err := loadArchive(ctx); err != nil {
@@ -189,8 +199,13 @@ func LoadWithEnv(appdir, whichenv string) (*Context, error) {
 
 // loadArchive loads the helm chart and build archive.
 func loadArchive(ctx *Context) (err error) {
-	if err = archiveSrc(ctx); err != nil {
-		return err
+	for _, controller := range ctx.Env.Controllers {
+		controllerPath := filepath.Join(ctx.AppDir, controller)
+		dCtx, err := archiveSrc(controllerPath, "")
+		if err != nil {
+			return err
+		}
+		ctx.DockerContexts = append(ctx.DockerContexts, dCtx)
 	}
 
 	// if a chart was specified in manifest, use it
@@ -238,19 +253,19 @@ func loadValues(ctx *Context) error {
 	return nil
 }
 
-func archiveSrc(ctx *Context) error {
-	contextDir, relDockerfile, err := build.GetContextFromLocalDir(ctx.AppDir, ctx.Env.Dockerfile)
+func archiveSrc(contextPath, dockerfileName string) (*DockerContext, error) {
+	contextDir, relDockerfile, err := build.GetContextFromLocalDir(contextPath, dockerfileName)
 	if err != nil {
-		return fmt.Errorf("unable to prepare docker context: %s", err)
+		return nil, fmt.Errorf("unable to prepare docker context: %s", err)
 	}
 	// canonicalize dockerfile name to a platform-independent one
 	relDockerfile, err = archive.CanonicalTarNameForPath(relDockerfile)
 	if err != nil {
-		return fmt.Errorf("cannot canonicalize dockerfile path %s: %v", relDockerfile, err)
+		return nil, fmt.Errorf("cannot canonicalize dockerfile path %s: %v", relDockerfile, err)
 	}
 	f, err := os.Open(filepath.Join(contextDir, DockerignoreFilename))
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return nil, err
 	}
 	defer f.Close()
 
@@ -258,14 +273,14 @@ func archiveSrc(ctx *Context) error {
 	if err == nil {
 		excludes, err = dockerignore.ReadAll(f)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	// do not include the charts directory. That will be packaged separately.
 	excludes = append(excludes, filepath.Join(contextDir, draft.ChartsDir))
 	if err := build.ValidateContextDirectory(contextDir, excludes); err != nil {
-		return fmt.Errorf("error checking docker context: '%s'", err)
+		return nil, fmt.Errorf("error checking docker context: '%s'", err)
 	}
 
 	// If .dockerignore mentions .dockerignore or the Dockerfile
@@ -284,22 +299,31 @@ func archiveSrc(ctx *Context) error {
 
 	logrus.Debugf("INCLUDES: %v", includes)
 	logrus.Debugf("EXCLUDES: %v", excludes)
-	rc, err := archive.TarWithOptions(contextDir, &archive.TarOptions{
-		Compression:     archive.Gzip,
+	dockerArchive, err := archive.TarWithOptions(contextDir, &archive.TarOptions{
 		ExcludePatterns: excludes,
 		IncludeFiles:    includes,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer rc.Close()
 
-	var b bytes.Buffer
-	if _, err := io.Copy(&b, rc); err != nil {
-		return err
-	}
-	ctx.Archive = b.Bytes()
-	return nil
+	return &DockerContext{Name: filepath.Base(contextDir), BuildContext: dockerArchive, Dockerfile: relDockerfile}, nil
+}
+
+func withName(dir, name string) []string {
+	var files []string
+	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			if strings.Compare(info.Name(), name) == 0 {
+				files = append(files, path)
+			}
+		}
+		return nil
+	})
+	return files
 }
 
 // Up handles incoming draft up requests and returns a stream of summaries or error.
@@ -436,7 +460,7 @@ func (b *Builder) prepareReleaseEnvironment(ctx context.Context, app *AppContext
 
 	authToken, err := b.ContainerBuilder.AuthToken(ctx, app)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve auth token for image %s: %v", app.MainImage, err)
+		return fmt.Errorf("failed to retrieve auth token: %v", err)
 	}
 
 	// we need to translate the auth token Docker gives us into a Kubernetes registry auth secret token.

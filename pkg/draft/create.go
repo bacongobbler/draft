@@ -17,6 +17,7 @@ const (
 	DrakeFilename = "Drakefile.go"
 	// DraftTomlFilename is the default filename for Draft application configuration.
 	DraftTomlFilename = "draft.toml"
+	DraftTomlFilepath = "config/draft.toml"
 	RoutesFile        = "routes"
 	BinDir            = "bin"
 	ConfigDir         = "config"
