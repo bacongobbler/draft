@@ -261,7 +261,7 @@ func loadRoutes(path string) ([]*route, error) {
 	for scanner.Scan() {
 		route, err := parseRoute(scanner.Text())
 		if err != nil {
-			fmt.Errorf("%s contains an invalid route: %v", err)
+			fmt.Errorf("%s contains an invalid route: %v", path, err)
 		}
 		if route == nil {
 			continue
