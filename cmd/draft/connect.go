@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -40,6 +41,14 @@ var (
 type connectCmd struct {
 	out      io.Writer
 	logLines int64
+}
+
+type route struct {
+	method       string
+	path         string
+	component    string
+	port         int
+	upstreamPath string
 }
 
 func newConnectCmd(out io.Writer) *cobra.Command {
@@ -79,11 +88,11 @@ func (cn *connectCmd) run(runningEnvironment string) (err error) {
 		return err
 	}
 
-	// routes, err := loadRoutes("config/routes")
-	// if err != nil {
-	// 	return err
-	// }
 	router := httprouter.New()
+	routes, err := loadRoutes("config/routes")
+	if err != nil {
+		return err
+	}
 
 	client, config, err := getKubeClient(kubeContext)
 	if err != nil {
@@ -133,14 +142,17 @@ func (cn *connectCmd) run(runningEnvironment string) (err error) {
 				exportEnv[prefix+"_SERVICE_HOST"] = fmt.Sprintf("localhost")
 				exportEnv[prefix+"_SERVICE_PORT"] = fmt.Sprintf("%#v", t.Local)
 			} else {
-				u, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%#v/", t.Local))
-				if err != nil {
-					return err
+				for _, rout := range routes {
+					if rout.component == cc.ContainerName {
+						u, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%#v%s", t.Local, rout.upstreamPath))
+						if err != nil {
+							return err
+						}
+						router.Handle(rout.method, rout.path, func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+							httputil.NewSingleHostReverseProxy(u).ServeHTTP(w, r)
+						})
+					}
 				}
-				router.GET("/"+cc.ContainerName, func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-					httputil.NewSingleHostReverseProxy(u).ServeHTTP(w, r)
-				})
-
 			}
 		}
 	}
@@ -235,3 +247,48 @@ func getLatestBuildID(appName string) (string, error) {
 }
 
 func sanitize(name string) string { return strings.Replace(strings.ToUpper(name), "-", "_", -1) }
+
+func loadRoutes(path string) ([]*route, error) {
+	var routes []*route
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	scanner.Split(bufio.ScanLines)
+
+	for scanner.Scan() {
+		route, err := parseRoute(scanner.Text())
+		if err != nil {
+			fmt.Errorf("%s contains an invalid route: %v", err)
+		}
+		if route == nil {
+			continue
+		}
+		routes = append(routes, route)
+	}
+	return routes, nil
+}
+
+func parseRoute(rout string) (*route, error) {
+	r := strings.TrimSpace(rout)
+	if strings.HasPrefix(r, "#") || strings.HasPrefix(r, "//") {
+		return nil, nil
+	}
+	parts := strings.Fields(r)
+	if len(parts) < 5 {
+		return nil, fmt.Errorf("route '%s' should contain a method, path, component, port and an optional upstream path, for example 'GET	/	hello	8080'", rout)
+	}
+	port, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return nil, fmt.Errorf("route '%s' contains an invalid port number: '%s'", rout, parts[3])
+	}
+	return &route{
+		method:       parts[0],
+		path:         parts[1],
+		component:    parts[2],
+		port:         port,
+		upstreamPath: parts[4],
+	}, nil
+}
