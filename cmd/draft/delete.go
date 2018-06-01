@@ -11,7 +11,7 @@ import (
 	"k8s.io/helm/pkg/helm"
 
 	"github.com/Azure/draft/pkg/draft"
-	"github.com/Azure/draft/pkg/local"
+	"github.com/Azure/draft/pkg/draft/manifest"
 	"github.com/Azure/draft/pkg/storage/kube/configmap"
 )
 
@@ -54,7 +54,7 @@ func (d *deleteCmd) run(runningEnvironment string) error {
 	if d.appName != "" {
 		name = d.appName
 	} else {
-		deployedApp, err := local.DeployedApplication(draft.DraftTomlFilepath, runningEnvironment)
+		deployedApp, err := manifest.DeployedApplication(draft.DraftTomlFilepath, runningEnvironment)
 		if err != nil {
 			return errors.New("Unable to detect app name\nPlease pass in the name of the application")
 

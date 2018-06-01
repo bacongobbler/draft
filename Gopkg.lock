@@ -477,6 +477,12 @@
   version = "1.0.4"
 
 [[projects]]
+  name = "github.com/julienschmidt/httprouter"
+  packages = ["."]
+  revision = "8c199fb6259ffc1af525cc3ad52ee60ba8359669"
+  version = "v1.1"
+
+[[projects]]
   branch = "master"
   name = "github.com/mailru/easyjson"
   packages = [
@@ -1325,6 +1331,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d6e2d761c4e9f30128e3cf5535a9370265a907224b18f493325c28c8ad7b9dca"
+  inputs-digest = "a1bdffb69e5ac8f22a97759f361ff98f38dd661e0cab891ba91ba2f26204a413"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -13,11 +16,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/julienschmidt/httprouter"
 	"github.com/spf13/cobra"
 
 	"github.com/Azure/draft/pkg/draft"
 	"github.com/Azure/draft/pkg/draft/draftpath"
-	"github.com/Azure/draft/pkg/local"
+	"github.com/Azure/draft/pkg/draft/manifest"
 )
 
 const (
@@ -70,10 +74,16 @@ func newConnectCmd(out io.Writer) *cobra.Command {
 }
 
 func (cn *connectCmd) run(runningEnvironment string) (err error) {
-	deployedApp, err := local.DeployedApplication(draft.DraftTomlFilepath, runningEnvironment)
+	deployedApp, err := manifest.DeployedApplication(draft.DraftTomlFilepath, runningEnvironment)
 	if err != nil {
 		return err
 	}
+
+	// routes, err := loadRoutes("config/routes")
+	// if err != nil {
+	// 	return err
+	// }
+	router := httprouter.New()
 
 	client, config, err := getKubeClient(kubeContext)
 	if err != nil {
@@ -123,12 +133,21 @@ func (cn *connectCmd) run(runningEnvironment string) (err error) {
 				exportEnv[prefix+"_SERVICE_HOST"] = fmt.Sprintf("localhost")
 				exportEnv[prefix+"_SERVICE_PORT"] = fmt.Sprintf("%#v", t.Local)
 			} else {
-				m := fmt.Sprintf("Connect to %v:%v on localhost:%#v\n", cc.ContainerName, t.Remote, t.Local)
-				connectionMessage += m
-				fmt.Fprintf(cn.out, m)
+				u, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%#v/", t.Local))
+				if err != nil {
+					return err
+				}
+				router.GET("/"+cc.ContainerName, func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+					httputil.NewSingleHostReverseProxy(u).ServeHTTP(w, r)
+				})
+
 			}
 		}
 	}
+
+	router.NotFound = http.FileServer(http.Dir("static")).ServeHTTP
+	go http.ListenAndServe(":8080", router)
+	fmt.Fprintf(cn.out, "Serving on http://127.0.0.1:8080\n")
 
 	stop := make(chan os.Signal, 1)
 	done := make(chan struct{})
@@ -146,7 +165,7 @@ func (cn *connectCmd) run(runningEnvironment string) (err error) {
 	}
 
 	for _, cc := range connection.ContainerConnections {
-		readCloser, err := connection.RequestLogStream(deployedApp.Namespace, cc.ContainerName, cn.logLines)
+		readCloser, err := connection.RequestLogStream(deployedApp.Namespace, cn.logLines)
 		if err != nil {
 			return err
 		}
@@ -191,14 +210,14 @@ func (cn *connectCmd) detach() error {
 	return nil
 }
 
-func writeContainerLogs(out io.Writer, in io.ReadCloser, containerName string) error {
+func writeContainerLogs(out io.Writer, in io.ReadCloser, name string) error {
 	b := bufio.NewReader(in)
 	for {
 		line, err := b.ReadString('\n')
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "[%v]: %v", containerName, line)
+		fmt.Fprintf(out, "[%v]: %v", name, line)
 	}
 }
 

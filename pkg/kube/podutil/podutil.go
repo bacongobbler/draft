@@ -48,7 +48,7 @@ func GetPodCondition(status *v1.PodStatus, conditionType v1.PodConditionType) (i
 
 // GetPod waits for a pod with the specified label to be ready, then returns it
 // if no pod is ready, it checks every second until a pod is ready until timeout is reached
-func GetPod(namespace string, draftLabelKey, name, annotationKey, buildID string, clientset kubernetes.Interface) (*v1.Pod, error) {
+func GetPod(namespace string, draftLabelKey, name, controllerLabelKey, controllerName, annotationKey, buildID string, clientset kubernetes.Interface) (*v1.Pod, error) {
 	var targetPod *v1.Pod
 	s := newStopChan()
 
@@ -58,7 +58,7 @@ func GetPod(namespace string, draftLabelKey, name, annotationKey, buildID string
 			newPod := n.(*v1.Pod)
 
 			// check the pod label and if pod is in terminating state
-			if (newPod.Labels[draftLabelKey] != name) || (newPod.Annotations[annotationKey] != buildID) || (newPod.ObjectMeta.DeletionTimestamp != nil) {
+			if (newPod.Labels[draftLabelKey] != name) || (newPod.Labels[controllerLabelKey] != controllerName) || (newPod.Annotations[annotationKey] != buildID) || (newPod.ObjectMeta.DeletionTimestamp != nil) {
 				return
 			}
 
@@ -81,8 +81,7 @@ func GetPod(namespace string, draftLabelKey, name, annotationKey, buildID string
 	}
 }
 
-// ListPods returns pods in the given namespace that match the labels and
-//    annotations given
+// ListPods returns pods in the given namespace that match the labels and annotations given
 func ListPods(namespace string, labels, annotations map[string]string, clientset kubernetes.Interface) ([]v1.Pod, error) {
 	pods := []v1.Pod{}
 

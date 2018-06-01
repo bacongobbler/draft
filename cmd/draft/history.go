@@ -7,7 +7,7 @@ import (
 	"io"
 
 	"github.com/Azure/draft/pkg/draft"
-	"github.com/Azure/draft/pkg/local"
+	"github.com/Azure/draft/pkg/draft/manifest"
 	"github.com/Azure/draft/pkg/storage"
 	"github.com/Azure/draft/pkg/storage/kube/configmap"
 	"github.com/ghodss/yaml"
@@ -49,7 +49,7 @@ func newHistoryCmd(out io.Writer) *cobra.Command {
 }
 
 func (cmd *historyCmd) run() error {
-	app, err := local.DeployedApplication(draft.DraftTomlFilepath, cmd.env)
+	app, err := manifest.DeployedApplication(draft.DraftTomlFilepath, cmd.env)
 	if err != nil {
 		return err
 	}
