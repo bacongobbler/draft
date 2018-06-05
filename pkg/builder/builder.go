@@ -137,8 +137,9 @@ func newAppContext(b *Builder, buildCtx *Context) (*AppContext, error) {
 
 		// inject certain values into the chart such as the registry location,
 		// the application name, buildID and the application version.
+		cleanName := strings.Replace(dockerBuildContext.Name, "-", "_", -1)
 		tplstr := "%s.image.repository=%s,%s.image.tag=%s,%s=%s,%s=%s"
-		inject := fmt.Sprintf(tplstr, dockerBuildContext.Name, imageRepository, dockerBuildContext.Name, imgtag, manifest.LabelKey, buildCtx.Env.Name, manifest.BuildIDKey, b.ID)
+		inject := fmt.Sprintf(tplstr, cleanName, imageRepository, cleanName, imgtag, manifest.LabelKey, buildCtx.Env.Name, manifest.BuildIDKey, b.ID)
 
 		if err := strvals.ParseInto(inject, vals); err != nil {
 			return nil, err
