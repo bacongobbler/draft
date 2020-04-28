@@ -19,9 +19,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/net/context"
-	"k8s.io/client-go/rest"
+	"github.com/Azure/azure-sdk-for-go/services/preview/containerregistry/mgmt/2019-12-01-preview/containerregistry"
 
-	"github.com/Azure/draft/pkg/azure/containerregistry"
 	"github.com/Azure/draft/pkg/azure/iam"
 	"github.com/Azure/draft/pkg/builder"
 	azurecontainerbuilder "github.com/Azure/draft/pkg/builder/azure"
@@ -146,7 +145,6 @@ func newUpCmd(out io.Writer) *cobra.Command {
 func (u *upCmd) run(environment string) (err error) {
 	var (
 		buildctx   *builder.Context
-		kubeConfig *rest.Config
 		ctx        = context.Background()
 		bldr       = builder.New()
 	)
@@ -210,12 +208,12 @@ func (u *upCmd) run(environment string) (err error) {
 		registriesClient := containerregistry.NewRegistriesClient(subscription.ID)
 		registriesClient.Authorizer = auth
 		registriesClient.AddToUserAgent(containerregistry.UserAgent())
-		buildsClient := containerregistry.NewBuildsClient(subscription.ID)
-		buildsClient.Authorizer = auth
-		buildsClient.AddToUserAgent(containerregistry.UserAgent())
+		runsClient := containerregistry.NewRunsClient(subscription.ID)
+		runsClient.Authorizer = auth
+		runsClient.AddToUserAgent(containerregistry.UserAgent())
 		cb = &azurecontainerbuilder.Builder{
 			RegistryClient: registriesClient,
-			BuildsClient:   buildsClient,
+			RunsClient:   runsClient,
 			AdalToken:      token,
 			Subscription:   subscription,
 		}
@@ -232,17 +230,13 @@ func (u *upCmd) run(environment string) (err error) {
 	bldr.ContainerBuilder = cb
 
 	// setup kube
-	bldr.Kube, kubeConfig, err = getKubeClient(kubeContext)
+	bldr.Kube, _, err = getKubeClient(kubeContext)
 	if err != nil {
 		return fmt.Errorf("Could not get a kube client: %s", err)
 	}
-	bldr.Helm, err = setupHelm(bldr.Kube, kubeConfig, tillerNamespace)
-	if err != nil {
-		return fmt.Errorf("Could not get a helm client: %s", err)
-	}
 
 	// setup the storage engine
-	bldr.Storage = configmap.NewConfigMaps(bldr.Kube.CoreV1().ConfigMaps(tillerNamespace))
+	bldr.Storage = configmap.NewConfigMaps(bldr.Kube.CoreV1().ConfigMaps("default"))
 	progressC := bldr.Up(ctx, buildctx)
 	opts := []cmdline.Option{cmdline.WithBuildID(bldr.ID)}
 

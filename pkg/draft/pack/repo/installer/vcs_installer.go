@@ -8,7 +8,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/Masterminds/vcs"
-	"k8s.io/helm/pkg/plugin/cache"
+	"helm.sh/helm/v3/pkg/plugin/cache"
 
 	"github.com/Azure/draft/pkg/draft/draftpath"
 	"github.com/Azure/draft/pkg/draft/pack/repo"

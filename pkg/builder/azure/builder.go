@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-storage-blob-go/2016-05-31/azblob"
+	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/Azure/draft/pkg/azure/blob"
-	"github.com/Azure/draft/pkg/azure/containerregistry"
+	"github.com/Azure/azure-sdk-for-go/services/preview/containerregistry/mgmt/2019-12-01-preview/containerregistry"
 	"github.com/Azure/draft/pkg/builder"
 	"github.com/Azure/go-autorest/autorest/adal"
 	azurecli "github.com/Azure/go-autorest/autorest/azure/cli"
@@ -25,7 +25,7 @@ import (
 // Builder contains information about the build environment
 type Builder struct {
 	RegistryClient containerregistry.RegistriesClient
-	BuildsClient   containerregistry.BuildsClient
+	RunsClient   containerregistry.RunsClient
 	AdalToken      adal.Token
 	Subscription   azurecli.Subscription
 }
@@ -63,7 +63,7 @@ func (b *Builder) Build(ctx context.Context, app *builder.AppContext, out chan<-
 
 		blockBlobService := azblob.NewBlockBlobURL(*u, azblob.NewPipeline(azblob.NewAnonymousCredential(), azblob.PipelineOptions{}))
 		// Upload the application tarball to acr build
-		_, err = blockBlobService.PutBlob(ctx, bytes.NewReader(app.Ctx.Archive), azblob.BlobHTTPHeaders{ContentType: "application/gzip"}, azblob.Metadata{}, azblob.BlobAccessConditions{})
+		_, err = blockBlobService.Upload(ctx, bytes.NewReader(app.Ctx.Archive), azblob.BlobHTTPHeaders{ContentType: "application/gzip"}, azblob.Metadata{}, azblob.BlobAccessConditions{})
 		if err != nil {
 			errc <- fmt.Errorf("Could not upload docker context to acr build: %v", err)
 			return
@@ -76,50 +76,49 @@ func (b *Builder) Build(ctx context.Context, app *builder.AppContext, out chan<-
 			imageNames = append(imageNames, fmt.Sprintf("%s:%s", app.Ctx.Env.Name, imageNameParts[len(imageNameParts)-1]))
 		}
 
-		var args []containerregistry.BuildArgument
+		var args []containerregistry.Argument
 
-		// TODO: once the API includes this as default, remove it
-		buildArgType := "DockerBuildArgument"
 		for k := range app.Ctx.Env.ImageBuildArgs {
 			name := k
 			value := app.Ctx.Env.ImageBuildArgs[k]
-			arg := containerregistry.BuildArgument{
-				Type:  &buildArgType,
+			arg := containerregistry.Argument{
 				Name:  &name,
 				Value: &value,
+				IsSecret: to.BoolPtr(false),
 			}
 			args = append(args, arg)
 		}
 
-		req := containerregistry.QuickBuildRequest{
+		req := containerregistry.DockerBuildRequest{
 			ImageNames:     to.StringSlicePtr(imageNames),
 			SourceLocation: sourceUploadDefinition.RelativePath,
-			BuildArguments: &args,
+			Arguments: &args,
 			IsPushEnabled:  to.BoolPtr(true),
 			Timeout:        to.Int32Ptr(600),
 			Platform: &containerregistry.PlatformProperties{
 				// TODO: make this configurable once ACR build supports windows containers
-				OsType: containerregistry.Linux,
+				Os: containerregistry.Linux,
+				Architecture: containerregistry.Amd64,
 				// NB: CPU isn't required right now, possibly want to make this configurable
 				// It'll actually default to 2 from the server
 				// CPU: to.Int32Ptr(1),
 			},
 			// TODO: make this configurable
 			DockerFilePath: to.StringPtr("Dockerfile"),
-			Type:           containerregistry.TypeQuickBuild,
+			Type:           containerregistry.TypeDockerBuildRequest,
 		}
-		bas, ok := req.AsBasicQueueBuildRequest()
+		bas, ok := req.AsBasicRunRequest()
 		if !ok {
 			errc <- errors.New("Failed to create quick build request")
 			return
 		}
-		future, err := b.RegistryClient.QueueBuild(ctx, app.Ctx.Env.ResourceGroupName, registryName, bas)
+		future, err := b.RegistryClient.ScheduleRun(ctx, app.Ctx.Env.ResourceGroupName, registryName, bas)
 		if err != nil {
 			errc <- fmt.Errorf("Could not while queue acr build: %v", err)
 			return
 		}
 
-		if err := future.WaitForCompletion(ctx, b.RegistryClient.Client); err != nil {
+		if err := future.WaitForCompletionRef(ctx, b.RegistryClient.Client); err != nil {
 			errc <- fmt.Errorf("Could not wait for acr build to complete: %v", err)
 			return
 		}
@@ -130,9 +129,9 @@ func (b *Builder) Build(ctx context.Context, app *builder.AppContext, out chan<-
 			return
 		}
 
-		logResult, err := b.BuildsClient.GetLogLink(ctx, app.Ctx.Env.ResourceGroupName, registryName, *fin.BuildID)
+		logResult, err := b.RunsClient.GetLogSasURL(ctx, app.Ctx.Env.ResourceGroupName, registryName, *fin.ID)
 		if err != nil {
-			errc <- fmt.Errorf("Could not retrieve acr build logs: %v", err)
+			errc <- fmt.Errorf("Could not retrieve build log SAS URL: %v", err)
 			return
 		}
 
@@ -143,43 +142,18 @@ func (b *Builder) Build(ctx context.Context, app *builder.AppContext, out chan<-
 
 		blobURL := blob.GetAppendBlobURL(*logResult.LogLink)
 
-		// Used for progress reporting to report the total number of bytes being downloaded.
-		var contentLength int64
-		rs := azblob.NewDownloadStream(ctx,
-			// We pass more than "blobUrl.GetBlob" here so we can capture the blob's full
-			// content length on the very first internal call to Read.
-			func(ctx context.Context, blobRange azblob.BlobRange, ac azblob.BlobAccessConditions, rangeGetContentMD5 bool) (*azblob.GetResponse, error) {
-				for {
-					properties, err := blobURL.GetPropertiesAndMetadata(ctx, ac)
-					if err != nil {
-						// retry if the blob doesn't exist yet
-						if strings.Contains(err.Error(), "The specified blob does not exist.") {
-							continue
-						}
-						return nil, err
-					}
-					// retry if the blob hasn't "completed"
-					if !blobComplete(properties.NewMetadata()) {
-						continue
-					}
-					break
-				}
-				resp, err := blobURL.GetBlob(ctx, blobRange, ac, rangeGetContentMD5)
-				if err != nil {
-					return nil, err
-				}
-				if contentLength == 0 {
-					// If 1st successful Get, record blob's full size for progress reporting
-					contentLength = resp.ContentLength()
-				}
-				return resp, nil
-			},
-			azblob.DownloadStreamOptions{})
-		defer rs.Close()
-
-		_, err = io.Copy(app.Log, rs)
+		get, err := blobURL.Download(ctx, 0, 0, azblob.BlobAccessConditions{}, false)
 		if err != nil {
-			errc <- fmt.Errorf("Could not stream acr build logs: %v", err)
+			errc <- fmt.Errorf("Could not retrieve build logs: %v", err)
+			return
+		}
+
+		reader := get.Body(azblob.RetryReaderOptions{})
+		defer reader.Close()
+
+		_, err = io.Copy(app.Log, reader)
+		if err != nil {
+			errc <- fmt.Errorf("Could not stream build logs: %v", err)
 			return
 		}
 
@@ -242,12 +216,12 @@ func blobComplete(metadata azblob.Metadata) bool {
 func (b *Builder) getACRDockerEntryFromARMToken(loginServer string) (*builder.DockerConfigEntryWithAuth, error) {
 	accessToken := b.AdalToken.OAuthToken()
 
-	directive, err := containerregistry.ReceiveChallengeFromLoginServer(loginServer)
+	directive, err := ReceiveChallengeFromLoginServer(loginServer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to receive challenge: %s", err)
 	}
 
-	registryRefreshToken, err := containerregistry.PerformTokenExchange(
+	registryRefreshToken, err := PerformTokenExchange(
 		loginServer, directive, b.Subscription.TenantID, accessToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to perform token exchange: %s", err)
@@ -255,7 +229,7 @@ func (b *Builder) getACRDockerEntryFromARMToken(loginServer string) (*builder.Do
 
 	glog.V(4).Infof("adding ACR docker config entry for: %s", loginServer)
 	return &builder.DockerConfigEntryWithAuth{
-		Username: containerregistry.DockerTokenLoginUsernameGUID,
+		Username: DockerTokenLoginUsernameGUID,
 		Password: registryRefreshToken,
 	}, nil
 }

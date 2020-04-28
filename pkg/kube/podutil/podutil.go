@@ -5,6 +5,7 @@ package podutil
 import (
 	"fmt"
 	"time"
+	"context"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,7 +92,7 @@ func ListPods(namespace string, labels, annotations map[string]string, clientset
 		labelSet[k] = v
 	}
 
-	podList, err := clientset.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: labelSet.AsSelector().String()})
+	podList, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSet.AsSelector().String()})
 	if err != nil {
 		return nil, err
 	}

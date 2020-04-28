@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/draft/pkg/local"
-	"github.com/Azure/draft/pkg/storage"
-	"github.com/Azure/draft/pkg/storage/kube/configmap"
+	"io"
+
 	"github.com/ghodss/yaml"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/gosuri/uitable"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"io"
-	"k8s.io/helm/pkg/timeconv"
+
+	"github.com/Azure/draft/pkg/local"
+	"github.com/Azure/draft/pkg/storage"
+	"github.com/Azure/draft/pkg/storage/kube/configmap"
 )
 
 const historyDesc = `Display the build history of a Draft application.`
@@ -55,7 +57,7 @@ func (cmd *historyCmd) run() error {
 	if err != nil {
 		return fmt.Errorf("Could not get a kube client: %v", err)
 	}
-	store := configmap.NewConfigMaps(client.CoreV1().ConfigMaps(tillerNamespace))
+	store := configmap.NewConfigMaps(client.CoreV1().ConfigMaps("default"))
 
 	// get history from store
 	h, err := getHistory(context.Background(), store, app.Name, cmd.max)
@@ -129,7 +131,7 @@ func toBuildHistory(ls []*storage.Object) (h buildHistory) {
 			BuildID: ls[i].GetBuildID(),
 			Release: rls,
 			Context: fmt.Sprintf("%X", ctx[len(ctx)-5:]),
-			Created: timeconv.String(ls[i].GetCreatedAt()),
+			Created: ptypes.TimestampString((ls[i].GetCreatedAt())),
 		})
 	}
 	return h

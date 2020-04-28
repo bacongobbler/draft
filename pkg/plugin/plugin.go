@@ -69,11 +69,6 @@ type Metadata struct {
 	// the `--debug` flag will be discarded.
 	IgnoreFlags bool `json:"ignoreFlags"`
 
-	// UseTunnel indicates that this command needs a tunnel.
-	// Setting this will cause a number of side effects, such as the
-	// automatic setting of HELM_HOST.
-	UseTunnel bool `json:"useTunnel"`
-
 	// PlatformHooks are commands that will run on events based on the platform specified.
 	PlatformHooks map[string]Hooks `json:"hooks"`
 

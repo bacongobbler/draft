@@ -13,26 +13,28 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Azure/draft/pkg/draft/manifest"
-	"github.com/Azure/draft/pkg/draft/pack"
-	"github.com/Azure/draft/pkg/local"
-	"github.com/Azure/draft/pkg/osutil"
-	"github.com/Azure/draft/pkg/storage"
 	"github.com/docker/cli/cli/command/image/build"
 	"github.com/docker/docker/builder/dockerignore"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/fileutils"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	"k8s.io/api/core/v1"
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/strvals"
+	v1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8s "k8s.io/client-go/kubernetes"
-	"k8s.io/helm/pkg/chartutil"
-	"k8s.io/helm/pkg/helm"
-	"k8s.io/helm/pkg/proto/hapi/chart"
-	"k8s.io/helm/pkg/proto/hapi/release"
-	"k8s.io/helm/pkg/strvals"
+
+	"github.com/Azure/draft/pkg/draft/manifest"
+	"github.com/Azure/draft/pkg/draft/pack"
+	"github.com/Azure/draft/pkg/local"
+	"github.com/Azure/draft/pkg/osutil"
+	"github.com/Azure/draft/pkg/storage"
 )
 
 const (
@@ -48,7 +50,7 @@ const (
 type Builder struct {
 	ID               string
 	ContainerBuilder ContainerBuilder
-	Helm             helm.Interface
+	HelmConfig       *action.Configuration
 	Kube             k8s.Interface
 	Storage          storage.Store
 	LogsDir          string
@@ -74,7 +76,7 @@ type Context struct {
 	EnvName string
 	AppDir  string
 	Chart   *chart.Chart
-	Values  *chart.Config
+	Values  chartutil.Values
 	SrcName string
 	Archive []byte
 }
@@ -127,16 +129,11 @@ func newAppContext(b *Builder, buildCtx *Context) (*AppContext, error) {
 	tplstr := "image.repository=%s,image.tag=%s,%s=%s,%s=%s"
 	inject := fmt.Sprintf(tplstr, imageRepository, imgtag, local.DraftLabelKey, buildCtx.Env.Name, local.BuildIDKey, b.ID)
 
-	vals, err := chartutil.ReadValues([]byte(buildCtx.Values.Raw))
-	if err != nil {
-		return nil, err
-	}
-	if err := strvals.ParseInto(inject, vals); err != nil {
+	if err := strvals.ParseInto(inject, buildCtx.Values); err != nil {
 		return nil, err
 	}
 
-	err = osutil.EnsureDirectory(filepath.Dir(b.Logs(buildCtx.Env.Name)))
-	if err != nil {
+	if err := osutil.EnsureDirectory(filepath.Dir(b.Logs(buildCtx.Env.Name))); err != nil {
 		return nil, err
 	}
 
@@ -158,7 +155,7 @@ func newAppContext(b *Builder, buildCtx *Context) (*AppContext, error) {
 		Images:    images,
 		MainImage: image,
 		Log:       logf,
-		Vals:      vals,
+		Vals:      buildCtx.Values,
 	}, nil
 }
 
@@ -210,7 +207,7 @@ func loadArchive(ctx *Context) (err error) {
 		if err != nil {
 			return err
 		}
-		if ctx.Chart, err = chartutil.LoadArchive(ar); err != nil {
+		if ctx.Chart, err = loader.LoadArchive(ar); err != nil {
 			return fmt.Errorf("failed to load chart archive %q: %v", ctx.Env.ChartTarPath, err)
 		}
 		return nil
@@ -221,7 +218,7 @@ func loadArchive(ctx *Context) (err error) {
 
 	// if a chart was specified in manifest, use it
 	if ctx.Env.Chart != "" {
-		ctx.Chart, err = chartutil.Load(filepath.Join(ctx.AppDir, ctx.Env.Chart))
+		ctx.Chart, err = loader.Load(filepath.Join(ctx.AppDir, ctx.Env.Chart))
 		if err != nil {
 			return err
 		}
@@ -236,7 +233,7 @@ func loadArchive(ctx *Context) (err error) {
 		for _, file := range files {
 			if file.IsDir() {
 				found = true
-				if ctx.Chart, err = chartutil.Load(filepath.Join(chartDir, file.Name())); err != nil {
+				if ctx.Chart, err = loader.Load(filepath.Join(chartDir, file.Name())); err != nil {
 					return err
 				}
 				break
@@ -257,11 +254,7 @@ func loadValues(ctx *Context) error {
 			return fmt.Errorf("failed to parse %q from draft.toml: %v", val, err)
 		}
 	}
-	s, err := vals.YAML()
-	if err != nil {
-		return fmt.Errorf("failed to encode values: %v", err)
-	}
-	ctx.Values = &chart.Config{Raw: s}
+	ctx.Values = vals
 	return nil
 }
 
@@ -276,10 +269,7 @@ func archiveSrc(ctx *Context) error {
 		return fmt.Errorf("unable to prepare docker context: %s", err)
 	}
 	// canonicalize dockerfile name to a platform-independent one
-	relDockerfile, err = archive.CanonicalTarNameForPath(relDockerfile)
-	if err != nil {
-		return fmt.Errorf("cannot canonicalize dockerfile path %s: %v", relDockerfile, err)
-	}
+	relDockerfile = archive.CanonicalTarNameForPath(relDockerfile)
 	f, err := os.Open(filepath.Join(contextDir, ".dockerignore"))
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -408,60 +398,49 @@ func (b *Builder) release(ctx context.Context, app *AppContext, out chan<- *Summ
 	// The returned error is a gSummaryhat wraps the message from the original error.
 	// So we're stuck doing string matching against the wrapped error, which is nested inside
 	// of the gSummaryessage.
-	_, err = b.Helm.ReleaseContent(app.Ctx.Env.Name, helm.ContentReleaseVersion(1))
+	historyClient := action.NewHistory(b.HelmConfig)
+	_, err = historyClient.Run(app.Ctx.Env.Name)
 	if err != nil && strings.Contains(err.Error(), "not found") {
 		msg := fmt.Sprintf("Release %q does not exist. Installing it now.", app.Ctx.Env.Name)
 		summary(msg, SummaryLogging)
 
-		vals, err := app.Vals.YAML()
-		if err != nil {
-			return err
-		}
-
-		opts := []helm.InstallOption{
-			helm.ReleaseName(app.Ctx.Env.Name),
-			helm.ValueOverrides([]byte(vals)),
-			helm.InstallWait(app.Ctx.Env.Wait),
-		}
-		rls, err := b.Helm.InstallReleaseFromChart(app.Ctx.Chart, app.Ctx.Env.Namespace, opts...)
+		installClient := action.NewInstall(b.HelmConfig)
+		installClient.ReleaseName = app.Ctx.Env.Name
+		installClient.Namespace = app.Ctx.Env.Namespace
+		installClient.CreateNamespace = true
+		installClient.Wait = app.Ctx.Env.Wait
+		rls, err := installClient.Run(app.Ctx.Chart, app.Vals)
 		if err != nil {
 			return fmt.Errorf("could not install release: %v", err)
 		}
-		app.Obj.Release = rls.Release.Name
-		formatReleaseStatus(app, rls.Release, summary)
+		app.Obj.Release = rls.Name
+		formatReleaseStatus(app, rls, summary)
 
 	} else {
 		msg := fmt.Sprintf("Upgrading %s.", app.Ctx.Env.Name)
 		summary(msg, SummaryLogging)
 
-		vals, err := app.Vals.YAML()
-		if err != nil {
-			return err
-		}
-
-		opts := []helm.UpdateOption{
-			helm.UpdateValueOverrides([]byte(vals)),
-			helm.UpgradeWait(app.Ctx.Env.Wait),
-		}
-		rls, err := b.Helm.UpdateReleaseFromChart(app.Ctx.Env.Name, app.Ctx.Chart, opts...)
+		upgradeAction := action.NewUpgrade(b.HelmConfig)
+		upgradeAction.Wait = app.Ctx.Env.Wait
+		rls, err := upgradeAction.Run(app.Ctx.Env.Name, app.Ctx.Chart, app.Vals)
 		if err != nil {
 			return fmt.Errorf("could not upgrade release: %v", err)
 		}
-		app.Obj.Release = rls.Release.Name
-		formatReleaseStatus(app, rls.Release, summary)
+		app.Obj.Release = rls.Name
+		formatReleaseStatus(app, rls, summary)
 	}
 	return nil
 }
 
 func (b *Builder) prepareReleaseEnvironment(ctx context.Context, app *AppContext) error {
 	// determine if the destination namespace exists, create it if not.
-	if _, err := b.Kube.CoreV1().Namespaces().Get(app.Ctx.Env.Namespace, metav1.GetOptions{}); err != nil {
+	if _, err := b.Kube.CoreV1().Namespaces().Get(context.Background(), app.Ctx.Env.Namespace, metav1.GetOptions{}); err != nil {
 		if !apiErrors.IsNotFound(err) {
 			return err
 		}
-		_, err = b.Kube.CoreV1().Namespaces().Create(&v1.Namespace{
+		_, err = b.Kube.CoreV1().Namespaces().Create(context.Background(), &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: app.Ctx.Env.Namespace},
-		})
+		}, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("could not create namespace %q: %v", app.Ctx.Env.Namespace, err)
 		}
@@ -486,11 +465,12 @@ func (b *Builder) prepareReleaseEnvironment(ctx context.Context, app *AppContext
 
 	// determine if the registry pull secret exists in the desired namespace, create it if not.
 	var secret *v1.Secret
-	if secret, err = b.Kube.CoreV1().Secrets(app.Ctx.Env.Namespace).Get(PullSecretName, metav1.GetOptions{}); err != nil {
+	if secret, err = b.Kube.CoreV1().Secrets(app.Ctx.Env.Namespace).Get(context.Background(), PullSecretName, metav1.GetOptions{}); err != nil {
 		if !apiErrors.IsNotFound(err) {
 			return err
 		}
 		_, err = b.Kube.CoreV1().Secrets(app.Ctx.Env.Namespace).Create(
+			context.Background(),
 			&v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      PullSecretName,
@@ -501,6 +481,7 @@ func (b *Builder) prepareReleaseEnvironment(ctx context.Context, app *AppContext
 					".dockercfg": string(js),
 				},
 			},
+			metav1.CreateOptions{},
 		)
 		if err != nil {
 			return fmt.Errorf("could not create registry pull secret: %v", err)
@@ -509,7 +490,7 @@ func (b *Builder) prepareReleaseEnvironment(ctx context.Context, app *AppContext
 		// the registry pull secret exists, check if it needs to be updated.
 		if data, ok := secret.StringData[".dockercfg"]; ok && data != string(js) {
 			secret.StringData[".dockercfg"] = string(js)
-			_, err = b.Kube.CoreV1().Secrets(app.Ctx.Env.Namespace).Update(secret)
+			_, err = b.Kube.CoreV1().Secrets(app.Ctx.Env.Namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("could not update registry pull secret: %v", err)
 			}
@@ -518,7 +499,7 @@ func (b *Builder) prepareReleaseEnvironment(ctx context.Context, app *AppContext
 
 	// determine if the default service account in the desired namespace has the correct
 	// imagePullSecret. If not, add it.
-	svcAcct, err := b.Kube.CoreV1().ServiceAccounts(app.Ctx.Env.Namespace).Get(DefaultServiceAccountName, metav1.GetOptions{})
+	svcAcct, err := b.Kube.CoreV1().ServiceAccounts(app.Ctx.Env.Namespace).Get(context.Background(), DefaultServiceAccountName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("could not load default service account: %v", err)
 	}
@@ -533,7 +514,7 @@ func (b *Builder) prepareReleaseEnvironment(ctx context.Context, app *AppContext
 		svcAcct.ImagePullSecrets = append(svcAcct.ImagePullSecrets, v1.LocalObjectReference{
 			Name: PullSecretName,
 		})
-		_, err := b.Kube.CoreV1().ServiceAccounts(app.Ctx.Env.Namespace).Update(svcAcct)
+		_, err := b.Kube.CoreV1().ServiceAccounts(app.Ctx.Env.Namespace).Update(context.Background(), svcAcct, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("could not modify default service account with registry pull secret: %v", err)
 		}
@@ -543,10 +524,10 @@ func (b *Builder) prepareReleaseEnvironment(ctx context.Context, app *AppContext
 }
 
 func formatReleaseStatus(app *AppContext, rls *release.Release, summary func(string, SummaryStatusCode)) {
-	status := fmt.Sprintf("%s %v", app.Ctx.Env.Name, rls.Info.Status.Code)
+	status := fmt.Sprintf("%s %v", app.Ctx.Env.Name, rls.Info.Status)
 	summary(status, SummaryLogging)
-	if rls.Info.Status.Notes != "" {
-		notes := fmt.Sprintf("notes: %v", rls.Info.Status.Notes)
+	if rls.Info.Notes != "" {
+		notes := fmt.Sprintf("notes: %v", rls.Info.Notes)
 		summary(notes, SummaryLogging)
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s.io/helm/pkg/chartutil"
-	"k8s.io/helm/pkg/proto/hapi/chart"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/chartutil"
 
 	"github.com/Azure/draft/pkg/osutil"
 )

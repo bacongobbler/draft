@@ -118,26 +118,6 @@ func loadPlugins(baseCmd *cobra.Command, home draftpath.Home, out io.Writer, in 
 			// This passes all the flags to the subcommand.
 			DisableFlagParsing: true,
 		}
-		if md.UseTunnel {
-			c.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-				// Parse the parent flag, but not the local flags.
-				k, _ := manuallyProcessArgs(args)
-				if err := c.Parent().ParseFlags(k); err != nil {
-					return err
-				}
-				client, config, err := getKubeClient(kubeContext)
-				if err != nil {
-					return fmt.Errorf("Could not get a kube client: %s", err)
-				}
-
-				tillerTunnel, err := setupTillerConnection(client, config, tillerNamespace)
-				if err != nil {
-					return err
-				}
-				tillerHost = fmt.Sprintf("127.0.0.1:%d", tillerTunnel.Local)
-				return nil
-			}
-		}
 
 		baseCmd.AddCommand(c)
 	}
@@ -191,7 +171,6 @@ func setupPluginEnv(shortname, ver, base, plugdirs string, home draftpath.Home) 
 		// trouble of re-parsing.
 		pluginEnvVar: pluginDirPath(home),
 		homeEnvVar:   home.String(),
-		hostEnvVar:   tillerHost,
 		// Set vars that convey common information.
 		"DRAFT_PACKS_HOME": home.Packs(),
 	} {

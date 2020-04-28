@@ -82,7 +82,6 @@ test-unit:
 	$(GO) test $(GOFLAGS) -cover -run $(TESTS) ./... $(TESTFLAGS)
 
 HAS_GOMETALINTER := $(shell command -v gometalinter;)
-HAS_DEP := $(shell command -v dep;)
 HAS_GOX := $(shell command -v gox;)
 HAS_GIT := $(shell command -v git;)
 HAS_BINDATA := $(shell command -v go-bindata;)
@@ -93,9 +92,6 @@ ifndef HAS_GOMETALINTER
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
 endif
-ifndef HAS_DEP
-	go get -u github.com/golang/dep/cmd/dep
-endif
 ifndef HAS_GOX
 	go get -u github.com/mitchellh/gox
 endif
@@ -105,6 +101,5 @@ endif
 ifndef HAS_BINDATA
 	go get github.com/jteeuwen/go-bindata/...
 endif
-	dep ensure -v
 
 include versioning.mk

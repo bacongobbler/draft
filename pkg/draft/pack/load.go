@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s.io/helm/pkg/chartutil"
+	"helm.sh/helm/v3/pkg/chart/loader"
 )
 
 // FromDir takes a string name, tries to resolve it to a file or directory, and then loads it.
@@ -22,7 +22,7 @@ func FromDir(dir string) (*Pack, error) {
 		return nil, err
 	}
 
-	pack.Chart, err = chartutil.LoadDir(filepath.Join(topdir, ChartsDir))
+	pack.Chart, err = loader.LoadDir(filepath.Join(topdir, ChartsDir))
 	if err != nil {
 		return nil, err
 	}
