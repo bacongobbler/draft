@@ -6,15 +6,27 @@
 package helpers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"os/exec"
 	"time"
-
-	"github.com/Azure/go-autorest/autorest/utils"
 )
+
+// GetCommit returns git HEAD (short)
+func GetCommit() string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return ""
+	}
+	return string(out.Bytes()[:7])
+}
 
 // PrintAndLog writes to stdout and to a logger.
 func PrintAndLog(message string) {
@@ -44,7 +56,7 @@ func contains(array []string, element string) bool {
 
 // UserAgent return the string to be appended to user agent header
 func UserAgent() string {
-	return "samples " + utils.GetCommit()
+	return "samples " + GetCommit()
 }
 
 // ReadJSON reads a json file, and unmashals it.

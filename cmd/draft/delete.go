@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"os"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"k8s.io/helm/pkg/helm"
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/cli"
 
 	"github.com/Azure/draft/pkg/local"
 	"github.com/Azure/draft/pkg/storage/kube/configmap"
@@ -78,26 +80,31 @@ func (d *deleteCmd) run(runningEnvironment string) error {
 // Returns an error if the command failed.
 func Delete(app string) error {
 	// set up helm client
-	client, config, err := getKubeClient(kubeContext)
+	client, _, err := getKubeClient(kubeContext)
 	if err != nil {
 		return fmt.Errorf("Could not get a kube client: %s", err)
 	}
 
 	// delete Draft storage for app
-	store := configmap.NewConfigMaps(client.CoreV1().ConfigMaps(tillerNamespace))
+	store := configmap.NewConfigMaps(client.CoreV1().ConfigMaps("default"))
 	if _, err := store.DeleteBuilds(context.Background(), app); err != nil {
 		return err
 	}
 
-	helmClient, err := setupHelm(client, config, tillerNamespace)
-	if err != nil {
+	settings := cli.New()
+	actionConfig := new(action.Configuration)
+	// You can pass an empty string instead of settings.Namespace() to list
+	// all namespaces
+	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
 		return err
 	}
 
+	uninstallAction := action.NewUninstall(actionConfig)
+
 	// delete helm release
-	_, err = helmClient.DeleteRelease(app, helm.DeletePurge(true))
+	_, err = uninstallAction.Run(app)
 	if err != nil {
-		return errors.New(grpc.ErrorDesc(err))
+		return err
 	}
 
 	taskList, err := tasks.Load(tasksTOMLFile)

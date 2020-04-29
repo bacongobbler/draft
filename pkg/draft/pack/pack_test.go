@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	"k8s.io/helm/pkg/proto/hapi/chart"
+	"helm.sh/helm/v3/pkg/chart"
 )
 
 const testDockerfile = `FROM nginx:latest

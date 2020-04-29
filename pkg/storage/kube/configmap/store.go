@@ -34,7 +34,7 @@ func (s *ConfigMaps) DeleteBuilds(ctx context.Context, appName string) ([]*stora
 	if err != nil {
 		return nil, err
 	}
-	err = s.impl.Delete(appName, &metav1.DeleteOptions{})
+	err = s.impl.Delete(ctx, appName, metav1.DeleteOptions{})
 	return builds, err
 }
 
@@ -43,7 +43,7 @@ func (s *ConfigMaps) DeleteBuilds(ctx context.Context, appName string) ([]*stora
 // DeleteBuild implements storage.Deleter.
 func (s *ConfigMaps) DeleteBuild(ctx context.Context, appName, buildID string) (obj *storage.Object, err error) {
 	var cfgmap *v1.ConfigMap
-	if cfgmap, err = s.impl.Get(appName, metav1.GetOptions{}); err != nil {
+	if cfgmap, err = s.impl.Get(ctx, appName, metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, storage.NewErrAppStorageNotFound(appName)
 		}
@@ -54,7 +54,7 @@ func (s *ConfigMaps) DeleteBuild(ctx context.Context, appName, buildID string) (
 			return nil, err
 		}
 		delete(cfgmap.Data, buildID)
-		_, err = s.impl.Update(cfgmap)
+		_, err = s.impl.Update(ctx, cfgmap, metav1.UpdateOptions{})
 		return obj, err
 	}
 	return nil, storage.NewErrAppBuildNotFound(appName, buildID)
@@ -76,7 +76,7 @@ func (s *ConfigMaps) CreateBuild(ctx context.Context, appName string, build *sto
 	if err != nil {
 		return err
 	}
-	if _, err = s.impl.Create(cfgmap); err != nil {
+	if _, err = s.impl.Create(ctx, cfgmap, metav1.CreateOptions{}); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return storage.NewErrAppStorageExists(appName)
 		}
@@ -93,7 +93,7 @@ func (s *ConfigMaps) CreateBuild(ctx context.Context, appName string, build *sto
 // UpdateBuild implements storage.Updater.
 func (s *ConfigMaps) UpdateBuild(ctx context.Context, appName string, build *storage.Object) (err error) {
 	var cfgmap *v1.ConfigMap
-	if cfgmap, err = s.impl.Get(appName, metav1.GetOptions{}); err != nil {
+	if cfgmap, err = s.impl.Get(ctx, appName, metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			return s.CreateBuild(ctx, appName, build)
 		}
@@ -110,7 +110,7 @@ func (s *ConfigMaps) UpdateBuild(ctx context.Context, appName string, build *sto
 		return err
 	}
 	cfgmap.Data[build.BuildID] = content
-	_, err = s.impl.Update(cfgmap)
+	_, err = s.impl.Update(ctx, cfgmap, metav1.UpdateOptions{})
 	return err
 }
 
@@ -119,7 +119,7 @@ func (s *ConfigMaps) UpdateBuild(ctx context.Context, appName string, build *sto
 // GetBuilds implements storage.Getter.
 func (s *ConfigMaps) GetBuilds(ctx context.Context, appName string) (builds []*storage.Object, err error) {
 	var cfgmap *v1.ConfigMap
-	if cfgmap, err = s.impl.Get(appName, metav1.GetOptions{}); err != nil {
+	if cfgmap, err = s.impl.Get(ctx, appName, metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, storage.NewErrAppStorageNotFound(appName)
 		}
@@ -140,7 +140,7 @@ func (s *ConfigMaps) GetBuilds(ctx context.Context, appName string) (builds []*s
 // GetBuild implements storage.Getter.
 func (s *ConfigMaps) GetBuild(ctx context.Context, appName, buildID string) (obj *storage.Object, err error) {
 	var cfgmap *v1.ConfigMap
-	if cfgmap, err = s.impl.Get(appName, metav1.GetOptions{}); err != nil {
+	if cfgmap, err = s.impl.Get(ctx, appName, metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, storage.NewErrAppStorageNotFound(appName)
 		}

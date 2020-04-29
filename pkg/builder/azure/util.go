@@ -1,4 +1,4 @@
-package containerregistry
+package azure
 
 import (
 	"bytes"

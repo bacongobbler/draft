@@ -9,23 +9,13 @@ import (
 
 	"github.com/rjeczalik/notify"
 	"golang.org/x/net/context"
-	"k8s.io/helm/pkg/ignore"
 )
-
-const ignoreFileName = ".draftignore"
 
 // Watch watches for inotify events in the build context's application directory, returning events
 // to the stream
 func (buildctx *Context) Watch(ctx context.Context, stream chan<- *Context) (err error) {
-	var rules *ignore.Rules
-	if rules, err = ignore.ParseFile(ignoreFileName); err != nil {
-		// only fail if exists and can't be parsed
-		if _, err = os.Stat(ignoreFileName); os.IsExist(err) {
-			return fmt.Errorf("could not load ignore watch list: %v", err)
-		}
-	}
 	defer close(stream)
-	return watch(ctx, buildctx.AppDir, rules, func() error {
+	return watch(ctx, buildctx.AppDir, func() error {
 		b, err := LoadWithEnv(buildctx.AppDir, buildctx.EnvName)
 		if err != nil {
 			return err
@@ -35,7 +25,7 @@ func (buildctx *Context) Watch(ctx context.Context, stream chan<- *Context) (err
 	})
 }
 
-func watch(ctx context.Context, dir string, rules *ignore.Rules, action func() error) error {
+func watch(ctx context.Context, dir string, action func() error) error {
 	infoc := make(chan notify.EventInfo, 1)
 	if err := notify.Watch(dir, infoc, notify.All); err != nil {
 		return fmt.Errorf("could not watch %q: %v", dir, err)
@@ -45,15 +35,6 @@ func watch(ctx context.Context, dir string, rules *ignore.Rules, action func() e
 	go func() {
 		for info := range infoc {
 			prefix := strings.TrimPrefix(info.Path(), dir+"/")
-			fi, err := os.Stat(info.Path())
-			if os.IsNotExist(err) {
-				// create dummy file info for removed file or directory
-				fi = removedFileInfo(filepath.Base(info.Path()))
-			}
-			// only rebuild if the changed file isn't in our ignore list
-			if rules != nil && rules.Ignore(prefix, fi) {
-				continue
-			}
 			// ignore manually everything inside the .git/ directory as
 			// helm ignore file doesn't have directory and whole content
 			// (subdir of subdir) ignore support yet.

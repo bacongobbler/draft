@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -180,7 +181,7 @@ func (c *Connection) RequestLogStream(namespace string, containerName string, lo
 			Container: containerName,
 		})
 
-	return req.Stream()
+	return req.Stream(context.Background())
 
 }
 
